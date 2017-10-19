@@ -2,10 +2,6 @@ AddCSLuaFile()
 
 gctp = gctp or {} local gctp = gctp
 
-concommand.Add("gctp_toggle", function()
-	gctp:Toggle()
-end)
-
 local mouse = {}
 local mousemove = {}
 mousemove.x = 0
@@ -24,6 +20,10 @@ local playerangles = (Angle(0,0,0))
 local IsEnabled = false
 local IsAiming = false
 local AllowZoom = false
+
+concommand.Add("gctp_toggle", function()
+	gctp:Toggle()
+end)
 
 function SetViewDistance( ply, cmd, args )
 	if args[1] then
@@ -59,7 +59,8 @@ function SetViewHeight( ply, cmd, args )
 	end
 end
 
-concommand.Add( "gctp_viewheight", SetViewHeight )
+concommand.Add( "gctp_viewheight", SetViewHeight )
+
 
 function GCCalcView( ply, pos, angles, fov )
 
