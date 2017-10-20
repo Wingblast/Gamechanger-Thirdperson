@@ -58,8 +58,7 @@ function SetViewHeight( ply, cmd, args )
 	end
 end
 
-concommand.Add( "gtp_viewheight", SetViewHeight )
-
+concommand.Add( "gtp_viewheight", SetViewHeight )
 
 function GCCalcView( ply, pos, angles, fov )
 
