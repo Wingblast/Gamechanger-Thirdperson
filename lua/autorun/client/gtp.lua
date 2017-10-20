@@ -22,6 +22,13 @@ local AllowZoom = false
 
 concommand.Add("gtp_toggle", function()
 	gtp:Toggle()
+	local plyeyeangs = LocalPlayer():EyeAngles()
+	movementangletarget.y = plyeyeangs.y
+	movementanglefinal.y = plyeyeangs.y
+	movementanglefinal.x = plyeyeangs.x
+	
+	mousemove.x = plyeyeangs.y*-1
+	mousemove.y = plyeyeangs.x
 end)
 
 function SetViewDistance( ply, cmd, args )
@@ -58,7 +65,8 @@ function SetViewHeight( ply, cmd, args )
 	end
 end
 
-concommand.Add( "gtp_viewheight", SetViewHeight )
+concommand.Add( "gtp_viewheight", SetViewHeight )
+
 
 function GCCalcView( ply, pos, angles, fov )
 
@@ -72,7 +80,7 @@ function GCCalcView( ply, pos, angles, fov )
 	angles.x = ( angles.x - playerangles.x + mousemove.y )
 	
 	trace.start = pos
-	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *20 ) + ( angles:Up() *-4 )
+	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *20 ) + ( angles:Up() *viewheightset )
 	trace.filter = LocalPlayer()
 	local trace = util.TraceLine( trace )
 
