@@ -1,7 +1,6 @@
 AddCSLuaFile()
 
-gctp = gctp or {} local gctp = gctp
-
+gtp = gtp or {}
 local mouse = {}
 local mousemove = {}
 mousemove.x = 0
@@ -21,8 +20,8 @@ local IsEnabled = false
 local IsAiming = false
 local AllowZoom = false
 
-concommand.Add("gctp_toggle", function()
-	gctp:Toggle()
+concommand.Add("gtp_toggle", function()
+	gtp:Toggle()
 end)
 
 function SetViewDistance( ply, cmd, args )
@@ -32,7 +31,7 @@ function SetViewDistance( ply, cmd, args )
 	end
 end
 
-concommand.Add( "gctp_viewdistance", SetViewDistance )
+concommand.Add( "gtp_viewdistance", SetViewDistance )
 
 function SetTurnSpeed( ply, cmd, args )
 	if args[1] then
@@ -41,7 +40,7 @@ function SetTurnSpeed( ply, cmd, args )
 	end
 end
 
-concommand.Add( "gctp_turnspeed", SetTurnSpeed )
+concommand.Add( "gtp_turnspeed", SetTurnSpeed )
 
 function SetAimTime( ply, cmd, args )
 	if args[1] then
@@ -50,7 +49,7 @@ function SetAimTime( ply, cmd, args )
 	end
 end
 
-concommand.Add( "gctp_aimtime", SetAimTime )
+concommand.Add( "gtp_aimtime", SetAimTime )
 
 function SetViewHeight( ply, cmd, args )
 	if args[1] then
@@ -59,7 +58,7 @@ function SetViewHeight( ply, cmd, args )
 	end
 end
 
-concommand.Add( "gctp_viewheight", SetViewHeight )
+concommand.Add( "gtp_viewheight", SetViewHeight )
 
 
 function GCCalcView( ply, pos, angles, fov )
@@ -223,31 +222,31 @@ function GCBindPress( ply, bind, pressed )
 	end
 end
 
-function gctp:Enable()
+function gtp:Enable()
 	IsEnabled = true
-	print("attempting to create gctp hooks")
+	print("attempting to create gtp hooks")
 	hook.Add( "CreateMove", "GCCreateMove", GCCreateMove )
 	hook.Add( "CalcView", "GCCalcView", GCCalcView )
 	hook.Add( "HUDPaint","Crosshair", GCCrosshair)
 	hook.Add( "PlayerBindPress", "GCBindPress", GCBindPress )
 end
 
-function gctp:Disable()
+function gtp:Disable()
 	IsEnabled = false
-	print("attempting to remove gctp hooks")
+	print("attempting to remove gtp hooks")
 	hook.Remove( "CreateMove", "GCCreateMove", GCCreateMove )
 	hook.Remove( "CalcView", "GCCalcView", GCCalcView )
 	hook.Remove( "HUDPaint","Crosshair", GCCrosshair )
 	hook.Remove( "PlayerBindPress", "GCBindPress", GCBindPress )
 end
 
-function gctp:Toggle()
+function gtp:Toggle()
 
 	if IsEnabled == true then
 
-			gctp:Disable()
+			gtp:Disable()
 	else
-			gctp:Enable()
+			gtp:Enable()
 	end
 
 end
