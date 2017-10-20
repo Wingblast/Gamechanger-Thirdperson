@@ -114,7 +114,7 @@ function GCCreateMove( cmd )
 		turnspeed = turnspeedset
 	end
 
-	if (cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2)) then
+	if ( cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2) ) then
 		IsAiming = true
 		aimtime = CurTime() + aimtimeset
 	elseif (aimtime < CurTime()) then
@@ -128,22 +128,22 @@ function GCCreateMove( cmd )
 	end
 		
 
-	if (cmd:KeyDown(IN_FORWARD) and IsAiming == false) then
+	if ( cmd:KeyDown(IN_FORWARD) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1
 		movementangletarget.y = movementanglemouse.y
-			if (cmd:KeyDown(IN_MOVERIGHT)) then
+			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
 				movementangletarget.y = movementanglemouse.y-45
 				cmd:SetSideMove(0)
 					cmd:SetForwardMove(1000)
-						elseif (cmd:KeyDown(IN_MOVELEFT)) then
+						elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 							movementangletarget.y = movementanglemouse.y+45
 							cmd:SetSideMove(0)
 							cmd:SetForwardMove(1000)
 			end
 	end
 
-	if (cmd:KeyDown(IN_MOVERIGHT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and IsAiming == false ) then
+	if ( cmd:KeyDown(IN_MOVERIGHT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and !IsAiming ) then
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1-90
 			movementangletarget.y = movementanglemouse.y
@@ -151,7 +151,7 @@ function GCCreateMove( cmd )
 			cmd:SetForwardMove(1000)
 	end
 
-	if (cmd:KeyDown(IN_MOVELEFT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and IsAiming == false ) then
+	if ( cmd:KeyDown(IN_MOVELEFT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and !IsAiming ) then
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1+90
 			movementangletarget.y = movementanglemouse.y
@@ -159,16 +159,16 @@ function GCCreateMove( cmd )
 			cmd:SetForwardMove(1000)
 	end
 
-	if (cmd:KeyDown(IN_BACK) and IsAiming == false ) then
+	if ( cmd:KeyDown(IN_BACK) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1+180
 		movementangletarget.y = movementanglemouse.y
 		cmd:SetForwardMove(1000)
-			if (cmd:KeyDown(IN_MOVERIGHT)) then
+			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
 				movementangletarget.y = movementanglemouse.y+45
 				cmd:SetSideMove(0)
 				cmd:SetForwardMove(1000)
-					elseif (cmd:KeyDown(IN_MOVELEFT)) then
+					elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 						movementangletarget.y = movementanglemouse.y-45
 						cmd:SetSideMove(0)
 						cmd:SetForwardMove(1000)
@@ -182,14 +182,14 @@ function GCCreateMove( cmd )
 	
 	mousemove.y = math.Clamp( mouse.y /35 + mousemove.y, -60, 89 )
 	
-	if ( AllowZoom == true ) then 
+	if ( AllowZoom ) then 
 		viewzoom = math.Clamp( mousewheel*-10 + viewzoom, 20, 800 )
 	end
 
 
 	movementanglefinal.y = math.ApproachAngle( movementanglefinal.y , movementangletarget.y , turnspeed)
 
-	if (playerangles != movementanglefinal) then
+	if ( playerangles != movementanglefinal ) then
 	cmd:SetViewAngles(movementanglefinal)
 	end
 
@@ -205,8 +205,8 @@ function GCCrosshair()
 	local x,y = p.x, p.y
 	 
 	--set the drawcolor
-	if (IsAiming == true) then
-		surface.SetDrawColor( 255, 255, 255, 0 )
+	if ( IsAiming ) then
+		surface.SetDrawColor( 255, 255, 255, 255 )
 		else 
 		surface.SetDrawColor( 255, 255, 255, 0 )
 	end
@@ -249,7 +249,7 @@ end
 
 function gtp:Toggle()
 
-	if IsEnabled == true then
+	if ( IsEnabled ) then
 
 			gtp:Disable()
 	else
