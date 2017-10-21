@@ -19,6 +19,7 @@ local playerangles = (Angle(0,0,0))
 local IsEnabled = false
 local IsAiming = false
 local AllowZoom = false
+local IsPhysgunRotating = false
 
 concommand.Add("gtp_toggle", function()
 	gtp:Toggle()
@@ -74,7 +75,6 @@ function GCCalcView( ply, pos, angles, fov )
 	local dist = viewzoom -- view distance
 	local trace = {}
 
-
 	-- offset calcview camera using player's original view
 	angles.y = ( angles.y - playerangles.y - mousemove.x )
 	angles.x = ( angles.x - playerangles.x + mousemove.y )
@@ -82,8 +82,11 @@ function GCCalcView( ply, pos, angles, fov )
 	trace.start = pos
 	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *20 ) + ( angles:Up() *viewheightset )
 	trace.filter = LocalPlayer()
-	local trace = util.TraceLine( trace )
-
+	trace.mins = Vector( -15, -15, -15 )
+	trace.maxs = Vector( 15, 15, 15 )
+	trace.mask = MASK_SHOT_HULL
+	local trace = util.TraceHull( trace )
+	
 	if( trace.HitPos:Distance( pos ) < dist - 0.05 ) then
 		dist = trace.HitPos:Distance( pos ) - 5
 	end
@@ -102,10 +105,16 @@ function GCCreateMove( cmd )
 	local ply = LocalPlayer()
 	
 	mousewheel = cmd:GetMouseWheel()
-	mouse.x = cmd:GetMouseX()
-	mouse.y = cmd:GetMouseY()
+	
+	if ( !IsPhysgunRotating ) then
+		mouse.x = cmd:GetMouseX()
+		mouse.y = cmd:GetMouseY()
+	else
+		mouse.x = 0
+		mouse.y = 0
+	end
 
-	if (IsAiming == true) then
+	if ( IsAiming ) then
 		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1
 		movementangletarget.y = movementanglemouse.y
@@ -117,16 +126,21 @@ function GCCreateMove( cmd )
 	if ( cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2) ) then
 		IsAiming = true
 		aimtime = CurTime() + aimtimeset
-	elseif (aimtime < CurTime()) then
+	elseif ( aimtime < CurTime() ) then
 		IsAiming = false
 	end
 	
-	if (cmd:KeyDown(IN_WALK)) then
+	if ( cmd:KeyDown(IN_WALK) ) then
 		AllowZoom = true
 	else
 		AllowZoom = false
 	end
 		
+	if ( ply:GetActiveWeapon():GetClass() == "weapon_physgun" ) and ( cmd:KeyDown(IN_ATTACK) ) and ( cmd:KeyDown(IN_USE) ) then
+		IsPhysgunRotating = true
+	else
+		IsPhysgunRotating = false
+	end
 
 	if ( cmd:KeyDown(IN_FORWARD) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
@@ -248,12 +262,9 @@ function gtp:Disable()
 end
 
 function gtp:Toggle()
-
 	if ( IsEnabled ) then
-
 			gtp:Disable()
 	else
 			gtp:Enable()
 	end
-
 end
