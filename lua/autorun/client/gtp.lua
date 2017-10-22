@@ -353,7 +353,7 @@ if CLIENT then
 		params.Max = 1000
 		params.Command = "gtp_viewdistance"
 		Panel:AddControl( "Slider", params )
-		Panel:ControlHelp("Hint: You can also use ALT+Scrollwheel to change the view distance on the fly.")
+		Panel:ControlHelp("Hint: You can also use ALT+Scrollwheel to change the view distance on the fly")
 		
 		local params = {}
 		params.Label = "Turning Speed:"
