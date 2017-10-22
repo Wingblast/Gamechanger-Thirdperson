@@ -357,11 +357,11 @@ if CLIENT then
 		local params = {}
 		params.Label = "Turning Speed:"
 		params.Type = "Float" 
-		params.Min = -100
-		params.Max = 100
+		params.Min = 0
+		params.Max = 10
 		params.Command = "gtp_turnspeed"
 		Panel:AddControl( "Slider", params )
-		Panel:ControlHelp("Sets the amount of time it takes for your player character to turn (in seconds)")
+		Panel:ControlHelp("Sets the player character turning rate (higher is faster)")
 		
 		local params = {}
 		params.Label = "Aiming Time:"
