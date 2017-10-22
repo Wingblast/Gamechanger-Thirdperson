@@ -236,7 +236,7 @@ function GCCreateMove( cmd )
 	
 	if ( AllowZoom ) then 
 		mousewheel = cmd:GetMouseWheel()
-		viewzoomset:SetFloat( math.Clamp( mousewheel*-10 + viewzoomset, 20, 800 ) )
+		viewzoomset:SetFloat( math.Clamp( mousewheel*-10 + viewzoomset:GetFloat(), 20, 800 ) )
 	end
 	
 	if ( IsAiming ) then
