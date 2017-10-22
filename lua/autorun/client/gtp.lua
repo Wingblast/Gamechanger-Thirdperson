@@ -8,14 +8,7 @@ local mousemove = {}
 mousemove.x = 0
 mousemove.y = 0
 local mousewheel = 0
-local viewzoomset = 140 -- view distance defaults to this when the script loads
-local viewzoom = 0
-local viewrightset = 20 -- view right defaults to this when the script loads
-local viewheightset = 2 -- view height defaults to this when the script loads
-local turnspeedset = 4 -- character turning speed defaults to this when the script loads
 local aimtime = 0 
-local aimtimeset = 3 -- aiming time defaults to this when the script loads
-local setfov = 4 -- fov defaults to this when the script loads
 local sideang = (Angle(0,0,0))
 local movementanglefinal = (Angle(0,0,0))
 local movementangletarget = (Angle(0,0,0))
@@ -25,6 +18,13 @@ local IsEnabled = false
 local IsAiming = false
 local AllowZoom = false
 local IsPhysgunRotating = false
+
+local viewzoomset = CreateConVar("gtp_viewdistance","140",FCVAR_ARCHIVE)
+local viewheightset = CreateConVar("gtp_viewheight","2",FCVAR_ARCHIVE)
+local viewrightset = CreateConVar("gtp_viewright","20",FCVAR_ARCHIVE)
+local turnspeedset = CreateConVar("gtp_turnspeed","4",FCVAR_ARCHIVE)
+local aimtimeset = CreateConVar("gtp_aimtime","3",FCVAR_ARCHIVE)
+local setfov = CreateConVar("gtp_fov","4",FCVAR_ARCHIVE)
 
 local DisabledMoveTypes = {
 	[MOVETYPE_FLY] = true,
@@ -46,7 +46,7 @@ end)
 function SetViewDistance( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		viewzoomset = numberinput
+		viewzoomset:SetFloat( numberinput )
 	end
 end
 
@@ -107,7 +107,9 @@ function GCCalcView( ply, pos, angles, fov )
 
 	local trace = {}
 	local view = {}
-	local dist = viewzoomset -- view distance
+	local dist = viewzoomset:GetFloat() -- view distance
+	local viewheight = viewheightset:GetFloat()
+	local viewright = viewrightset:GetFloat()
 	
 	-- offset calcview camera using player's original view
 	angles.y = ( angles.y - playerangles.y - mousemove.x )
@@ -118,7 +120,7 @@ function GCCalcView( ply, pos, angles, fov )
 	sideang = angles
 	
 	trace.start = pos
-	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset ) + ( angles:Up() *viewheightset )
+	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewright ) + ( angles:Up() *viewheight )
 	trace.filter = player.GetAll()
 	trace.mins = Vector( -15, -15, -15 )
 	trace.maxs = Vector( 15, 15, 15 )
@@ -129,15 +131,15 @@ function GCCalcView( ply, pos, angles, fov )
 		dist = trace.HitPos:Distance( pos ) - 5
 	end
 	
-	trace.start = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset ) + ( angles:Up() *viewheightset )
+	trace.start = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewright ) + ( angles:Up() *viewheight )
 	trace.endpos = angles:Forward() *2147483647 
 	trace.filter = LocalPlayer()
 	trace.mask = MASK_SHOT
 	cameratracehitpos = util.TraceLine( trace )
 	
-	view.origin = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset ) + ( angles:Up() *viewheightset )
+	view.origin = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewright ) + ( angles:Up() *viewheight )
 	view.angles = angles
-	view.fov = fov -setfov
+	view.fov = fov -setfov:GetFloat()
 	view.drawviewer = true
 	
 	return view
@@ -160,7 +162,7 @@ function GCCreateMove( cmd )
 	
 	if ( cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2) ) then
 		IsAiming = true
-		aimtime = CurTime() + aimtimeset
+		aimtime = CurTime() + aimtimeset:GetFloat()
 	elseif ( aimtime < CurTime() ) then
 		IsAiming = false
 	end
@@ -225,7 +227,7 @@ function GCCreateMove( cmd )
 			end
 	end
 
-	-- for some reason, having this mouse stuff in here instead of in the calcview function makes it work much better. So don't touch this stuff either.
+	-- for some reason, having this mouse stuff in here instead of in the calcview function makes it work much better. So don't touch this stuff.
 	
 	mousemove.x = math.Clamp( mouse.x /35 + mousemove.x, -360, 360)
 	if ( mousemove.x == 360 ) or ( mousemove.x == -360 ) then mousemove.x = 0 end
@@ -234,7 +236,7 @@ function GCCreateMove( cmd )
 	
 	if ( AllowZoom ) then 
 		mousewheel = cmd:GetMouseWheel()
-		viewzoomset = math.Clamp( mousewheel*-10 + viewzoomset, 20, 800 )
+		viewzoomset:SetFloat( math.Clamp( mousewheel*-10 + viewzoomset, 20, 800 ) )
 	end
 	
 	if ( IsAiming ) then
@@ -253,7 +255,7 @@ function GCCreateMove( cmd )
 			cmd:SetSideMove( movementvector.y )
 		end
 	else
-		movementanglefinal.y = math.ApproachAngle( movementanglefinal.y , movementangletarget.y , turnspeedset )
+		movementanglefinal.y = math.ApproachAngle( movementanglefinal.y , movementangletarget.y , turnspeedset:GetFloat() )
 	end
 
 	if ( playerangles != movementanglefinal ) then
@@ -320,4 +322,71 @@ function gtp:Toggle()
 	else
 			gtp:Enable()
 	end
+end
+
+if CLIENT then
+
+	local function SettingsPanel( Panel )
+	
+		Panel:Button("Toggle Thirdperson","gtp_toggle")
+		
+		local params = {}
+		params.Label = "Offset X:"
+		params.Type = "Float" 
+		params.Min = -100
+		params.Max = 100
+		params.Command = "gtp_viewright"
+		Panel:AddControl( "Slider", params )
+
+		local params = {}
+		params.Label = "Offset Z:"
+		params.Type = "Float" 
+		params.Min = -100
+		params.Max = 100
+		params.Command = "gtp_viewheight"
+		Panel:AddControl( "Slider", params )
+		
+		local params = {}
+		params.Label = "Camera View Distance:"
+		params.Type = "Float" 
+		params.Min = 0
+		params.Max = 1000
+		params.Command = "gtp_viewdistance"
+		Panel:AddControl( "Slider", params )
+		
+		local params = {}
+		params.Label = "Turning Speed:"
+		params.Type = "Float" 
+		params.Min = -100
+		params.Max = 100
+		params.Command = "gtp_turnspeed"
+		Panel:AddControl( "Slider", params )
+		Panel:ControlHelp("Sets the amount of time it takes for your player character to turn (in seconds)")
+		
+		local params = {}
+		params.Label = "Aiming Time:"
+		params.Type = "Float" 
+		params.Min = -100
+		params.Max = 100
+		params.Command = "gtp_aimtime"
+		Panel:AddControl( "Slider", params )
+		Panel:ControlHelp("Sets the amount of time your player character aims for (in seconds)")
+		
+		local params = {}
+		params.Label = "Field of View:"
+		params.Type = "Float" 
+		params.Min = -100
+		params.Max = 100
+		params.Command = "gtp_fov"
+		Panel:AddControl( "Slider", params )
+		Panel:ControlHelp("Sets the thirdperson FOV (current numbers are dumb, I know, will be fixed later)")
+		
+	end
+
+	local function creategtpmenu()
+		spawnmenu.AddToolMenuOption("Utilities", "Gamechanger", "gtpsettings", "Thirdperson Settings", "", "", SettingsPanel)
+	end
+	
+	hook.Add( "PopulateToolMenu", "gtpmenus", creategtpmenu)
+	
 end
