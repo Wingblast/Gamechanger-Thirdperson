@@ -1,17 +1,22 @@
 AddCSLuaFile()
 
 gtp = gtp or {}
+local neweyeangs
+local cameratracehitpos
 local mouse = {}
 local mousemove = {}
 mousemove.x = 0
 mousemove.y = 0
 local mousewheel = 0
-local viewzoom = 140 -- view distance defaults to this when the script loads
+local viewzoomset = 140 -- view distance defaults to this when the script loads
+local viewzoom = 0
+local viewrightset = 20 -- view right defaults to this when the script loads
 local viewheightset = 2 -- view height defaults to this when the script loads
-local turnspeed = 0
 local turnspeedset = 4 -- character turning speed defaults to this when the script loads
 local aimtime = 0 
 local aimtimeset = 3 -- aiming time defaults to this when the script loads
+local setfov = 4 -- fov defaults to this when the script loads
+local sideang = (Angle(0,0,0))
 local movementanglefinal = (Angle(0,0,0))
 local movementangletarget = (Angle(0,0,0))
 local movementanglemouse = (Angle(0,0,0))
@@ -21,21 +26,27 @@ local IsAiming = false
 local AllowZoom = false
 local IsPhysgunRotating = false
 
+local DisabledMoveTypes = {
+	[MOVETYPE_FLY] = true,
+	[MOVETYPE_FLYGRAVITY] = true,
+	[MOVETYPE_OBSERVER] = true,
+	[MOVETYPE_NOCLIP] = true
+}
+
 concommand.Add("gtp_toggle", function()
 	gtp:Toggle()
 	local plyeyeangs = LocalPlayer():EyeAngles()
 	movementangletarget.y = plyeyeangs.y
 	movementanglefinal.y = plyeyeangs.y
 	movementanglefinal.x = plyeyeangs.x
-	
 	mousemove.x = plyeyeangs.y*-1
 	mousemove.y = plyeyeangs.x
 end)
 
 function SetViewDistance( ply, cmd, args )
 	if args[1] then
-	local numberinput = tonumber( args[1] )
-		viewzoom = numberinput
+		local numberinput = tonumber( args[1] )
+		viewzoomset = numberinput
 	end
 end
 
@@ -43,7 +54,7 @@ concommand.Add( "gtp_viewdistance", SetViewDistance )
 
 function SetTurnSpeed( ply, cmd, args )
 	if args[1] then
-	local numberinput = tonumber( args[1] )
+		local numberinput = tonumber( args[1] )
 		turnspeedset = numberinput
 	end
 end
@@ -52,7 +63,7 @@ concommand.Add( "gtp_turnspeed", SetTurnSpeed )
 
 function SetAimTime( ply, cmd, args )
 	if args[1] then
-	local numberinput = tonumber( args[1] )
+		local numberinput = tonumber( args[1] )
 		aimtimeset = numberinput
 	end
 end
@@ -61,27 +72,54 @@ concommand.Add( "gtp_aimtime", SetAimTime )
 
 function SetViewHeight( ply, cmd, args )
 	if args[1] then
-	local numberinput = tonumber( args[1] )
+		local numberinput = tonumber( args[1] )
 		viewheightset = numberinput
 	end
 end
 
 concommand.Add( "gtp_viewheight", SetViewHeight )
 
+function SetViewRight( ply, cmd, args )
+	if args[1] then
+		local numberinput = tonumber( args[1] )
+		viewrightset = numberinput
+	end
+end
+
+concommand.Add( "gtp_viewright", SetViewRight )
+
+function SetFOV( ply, cmd, args )
+	if args[1] then
+		local numberinput = tonumber( args[1] )
+		setfov = numberinput
+	end
+end
+
+concommand.Add( "gtp_fov", SetFOV )
+
+function ConvertAim(from, to)
+	local ang = to - from
+
+	return ang:Angle()
+end
 
 function GCCalcView( ply, pos, angles, fov )
 
-	local view = {}
-	local dist = viewzoom -- view distance
 	local trace = {}
-
+	local view = {}
+	local dist = viewzoomset -- view distance
+	
 	-- offset calcview camera using player's original view
 	angles.y = ( angles.y - playerangles.y - mousemove.x )
 	angles.x = ( angles.x - playerangles.x + mousemove.y )
 	
+	local tmpang = Angle(angles.p, angles.y, angles.r)
+	angles:Normalize()
+	sideang = angles
+	
 	trace.start = pos
-	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *20 ) + ( angles:Up() *viewheightset )
-	trace.filter = LocalPlayer()
+	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset ) + ( angles:Up() *viewheightset )
+	trace.filter = player.GetAll()
 	trace.mins = Vector( -15, -15, -15 )
 	trace.maxs = Vector( 15, 15, 15 )
 	trace.mask = MASK_SHOT_HULL
@@ -91,9 +129,15 @@ function GCCalcView( ply, pos, angles, fov )
 		dist = trace.HitPos:Distance( pos ) - 5
 	end
 	
-	view.origin = pos - ( angles:Forward() *dist ) + ( angles:Right() *20 ) + ( angles:Up() *viewheightset )
+	trace.start = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset ) + ( angles:Up() *viewheightset )
+	trace.endpos = angles:Forward() *2147483647 
+	trace.filter = LocalPlayer()
+	trace.mask = MASK_SHOT
+	cameratracehitpos = util.TraceLine( trace )
+	
+	view.origin = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset ) + ( angles:Up() *viewheightset )
 	view.angles = angles
-	view.fov = fov -4
+	view.fov = fov -setfov
 	view.drawviewer = true
 	
 	return view
@@ -104,7 +148,7 @@ function GCCreateMove( cmd )
 	
 	local ply = LocalPlayer()
 	
-	mousewheel = cmd:GetMouseWheel()
+	if ( !ply:Alive() ) then return end
 	
 	if ( !IsPhysgunRotating ) then
 		mouse.x = cmd:GetMouseX()
@@ -113,16 +157,7 @@ function GCCreateMove( cmd )
 		mouse.x = 0
 		mouse.y = 0
 	end
-
-	if ( IsAiming ) then
-		movementanglefinal.x = mousemove.y
-		movementanglemouse.y = mousemove.x*-1
-		movementangletarget.y = movementanglemouse.y
-		turnspeed = 9999
-		else 
-		turnspeed = turnspeedset
-	end
-
+	
 	if ( cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2) ) then
 		IsAiming = true
 		aimtime = CurTime() + aimtimeset
@@ -136,11 +171,12 @@ function GCCreateMove( cmd )
 		AllowZoom = false
 	end
 		
-	if ( ply:GetActiveWeapon():GetClass() == "weapon_physgun" ) and ( cmd:KeyDown(IN_ATTACK) ) and ( cmd:KeyDown(IN_USE) ) then
+	if ( ply:GetActiveWeapon():IsValid() ) and ( ply:GetActiveWeapon():GetClass() == "weapon_physgun" ) and ( cmd:KeyDown(IN_ATTACK) ) and ( cmd:KeyDown(IN_USE) ) then
 		IsPhysgunRotating = true
 	else
 		IsPhysgunRotating = false
 	end
+
 
 	if ( cmd:KeyDown(IN_FORWARD) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
@@ -189,7 +225,7 @@ function GCCreateMove( cmd )
 			end
 	end
 
-	-- for some reason, having this mouse stuff in here (createmove func) instead of in the calcview function makes it work much better. So don't move this stuff.
+	-- for some reason, having this mouse stuff in here instead of in the calcview function makes it work much better. So don't touch this stuff either.
 	
 	mousemove.x = math.Clamp( mouse.x /35 + mousemove.x, -360, 360)
 	if ( mousemove.x == 360 ) or ( mousemove.x == -360 ) then mousemove.x = 0 end
@@ -197,11 +233,28 @@ function GCCreateMove( cmd )
 	mousemove.y = math.Clamp( mouse.y /35 + mousemove.y, -60, 89 )
 	
 	if ( AllowZoom ) then 
-		viewzoom = math.Clamp( mousewheel*-10 + viewzoom, 20, 800 )
+		mousewheel = cmd:GetMouseWheel()
+		viewzoomset = math.Clamp( mousewheel*-10 + viewzoomset, 20, 800 )
 	end
-
-
-	movementanglefinal.y = math.ApproachAngle( movementanglefinal.y , movementangletarget.y , turnspeed)
+	
+	if ( IsAiming ) then
+		neweyeangs = ConvertAim(ply:GetShootPos(), cameratracehitpos.HitPos)
+		neweyeangs:Normalize()
+		movementangletarget.x = neweyeangs.x
+		movementangletarget.y = neweyeangs.y
+		movementanglefinal.y = neweyeangs.y
+		movementanglefinal.x = neweyeangs.x
+		
+		-- allows for the character's movement angles to remain unchanged while aiming
+		if ( !DisabledMoveTypes[ply:GetMoveType()] ) then 
+			movementvector = Vector( cmd:GetForwardMove(), cmd:GetSideMove(), cmd:GetUpMove() )
+			movementvector:Rotate( cmd:GetViewAngles() - sideang )
+			cmd:SetForwardMove( movementvector.x )
+			cmd:SetSideMove( movementvector.y )
+		end
+	else
+		movementanglefinal.y = math.ApproachAngle( movementanglefinal.y , movementangletarget.y , turnspeedset )
+	end
 
 	if ( playerangles != movementanglefinal ) then
 	cmd:SetViewAngles(movementanglefinal)
@@ -220,7 +273,7 @@ function GCCrosshair()
 	 
 	--set the drawcolor
 	if ( IsAiming ) then
-		surface.SetDrawColor( 255, 255, 255, 255 )
+		surface.SetDrawColor( 255, 255, 255, 0 )
 		else 
 		surface.SetDrawColor( 255, 255, 255, 0 )
 	end
@@ -248,7 +301,7 @@ function gtp:Enable()
 	print("attempting to create gtp hooks")
 	hook.Add( "CreateMove", "GCCreateMove", GCCreateMove )
 	hook.Add( "CalcView", "GCCalcView", GCCalcView )
-	hook.Add( "HUDPaint","Crosshair", GCCrosshair)
+	hook.Add( "HUDPaint","Crosshair", GCCrosshair )
 	hook.Add( "PlayerBindPress", "GCBindPress", GCBindPress )
 end
 
