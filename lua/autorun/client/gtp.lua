@@ -9,15 +9,21 @@ mousemove.x = 0
 mousemove.y = 0
 local mousewheel = 0
 local aimtime = 0 
+local gcvdist = 0
+local setfov = 4 -- fov defaults to this when the script loads
 local sideang = (Angle(0,0,0))
 local movementanglefinal = (Angle(0,0,0))
 local movementangletarget = (Angle(0,0,0))
 local movementanglemouse = (Angle(0,0,0))
 local playerangles = (Angle(0,0,0))
+local gcvang = (Angle(0,0,0))
+local gcvpos = (Vector(0,0,0))
 local IsEnabled = false
 local IsAiming = false
 local AllowZoom = false
 local IsPhysgunRotating = false
+local AimIsToggled = false
+local toggleaim = false
 
 local viewzoomset = CreateConVar("gtp_viewdistance","140",FCVAR_ARCHIVE)
 local viewheightset = CreateConVar("gtp_viewheight","2",FCVAR_ARCHIVE)
@@ -42,7 +48,16 @@ concommand.Add("gtp_toggle", function()
 	mousemove.x = plyeyeangs.y*-1
 	mousemove.y = plyeyeangs.x
 end)
+		
+function SetToggleAim( ply, cmd, args )
+	if args[1] then
+		local boolinput = tobool( args[1] )
+		toggleaim = boolinput
+	end
+end
 
+concommand.Add("gtp_toggleaim", SetToggleAim )
+	
 function SetViewDistance( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
@@ -108,8 +123,6 @@ function GCCalcView( ply, pos, angles, fov )
 	local trace = {}
 	local view = {}
 	local dist = viewzoomset:GetFloat() -- view distance
-	local viewheight = viewheightset:GetFloat()
-	local viewright = viewrightset:GetFloat()
 	
 	-- offset calcview camera using player's original view
 	angles.y = ( angles.y - playerangles.y - mousemove.x )
@@ -120,27 +133,34 @@ function GCCalcView( ply, pos, angles, fov )
 	sideang = angles
 	
 	trace.start = pos
-	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewright ) + ( angles:Up() *viewheight )
+	trace.endpos = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset:GetFloat() ) + ( angles:Up() *viewheightset:GetFloat() )
 	trace.filter = player.GetAll()
 	trace.mins = Vector( -15, -15, -15 )
 	trace.maxs = Vector( 15, 15, 15 )
 	trace.mask = MASK_SHOT_HULL
 	local trace = util.TraceHull( trace )
 	
-	if( trace.HitPos:Distance( pos ) < dist - 0.05 ) then
+	if( trace.HitPos:Distance( pos ) < dist ) then
 		dist = trace.HitPos:Distance( pos ) - 5
 	end
 	
-	trace.start = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewright ) + ( angles:Up() *viewheight )
-	trace.endpos = angles:Forward() *2147483647 
-	trace.filter = LocalPlayer()
-	trace.mask = MASK_SHOT
-	cameratracehitpos = util.TraceLine( trace )
-	
-	view.origin = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewright ) + ( angles:Up() *viewheight )
+	view.origin = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset:GetFloat() ) + ( angles:Up() *viewheightset:GetFloat() )
 	view.angles = angles
 	view.fov = fov -setfov:GetFloat()
 	view.drawviewer = true
+	
+	gcvang = angles
+	gcvpos = pos
+	gcvdist = dist
+	
+	-- FUCKING HELP ME, I'M BEING FORCED TO WRITE SPAGHETTI CODE, THIS SHIT SHOULD NOT BE IN HERE AT ALL BUT IT DOESN'T WORK OTHERWISE
+	if ( ply:KeyPressed(IN_ATTACK2) ) and ( toggleaim ) and ( !AimIsToggled ) then
+			IsAiming = true
+			AimIsToggled = true
+	elseif ( ply:KeyPressed(IN_ATTACK2) ) and ( toggleaim ) and ( AimIsToggled ) then
+			IsAiming = false
+			AimIsToggled = false
+	end
 	
 	return view
 
@@ -149,8 +169,16 @@ end
 function GCCreateMove( cmd )
 	
 	local ply = LocalPlayer()
+	local trace = {}
 	
 	if ( !ply:Alive() ) then return end
+	
+	-- The crosshair hitpos trace is in here because it is less responsive in the calcview function.
+	trace.start = gcvpos - ( gcvang:Forward() *gcvdist ) + ( gcvang:Right() *viewrightset:GetFloat() ) + ( gcvang:Up() *viewheightset:GetFloat() )
+	trace.endpos = gcvang:Forward() *2147483647 
+	trace.filter = LocalPlayer()
+	trace.mask = MASK_SHOT
+	cameratracehitpos = util.TraceLine( trace )
 	
 	if ( !IsPhysgunRotating ) then
 		mouse.x = cmd:GetMouseX()
@@ -160,10 +188,11 @@ function GCCreateMove( cmd )
 		mouse.y = 0
 	end
 	
-	if ( cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2) ) then
+	if ( !AimIsToggled ) and ( cmd:KeyDown(IN_ATTACK) ) or ( ( cmd:KeyDown(IN_ATTACK2) )  and ( !toggleaim ) ) then
 		IsAiming = true
 		aimtime = CurTime() + aimtimeset:GetFloat()
-	elseif ( aimtime < CurTime() ) then
+		print(toggleaim)
+	elseif ( !AimIsToggled ) and ( aimtime < CurTime() ) then
 		IsAiming = false
 	end
 	
@@ -186,12 +215,12 @@ function GCCreateMove( cmd )
 		movementangletarget.y = movementanglemouse.y
 			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
 				movementangletarget.y = movementanglemouse.y-45
+				cmd:SetForwardMove(cmd:GetSideMove())
 				cmd:SetSideMove(0)
-					cmd:SetForwardMove(1000)
 						elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 							movementangletarget.y = movementanglemouse.y+45
+							cmd:SetForwardMove(cmd:GetSideMove()*-1)
 							cmd:SetSideMove(0)
-							cmd:SetForwardMove(1000)
 			end
 	end
 
@@ -199,31 +228,31 @@ function GCCreateMove( cmd )
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1-90
 			movementangletarget.y = movementanglemouse.y
+			cmd:SetForwardMove(cmd:GetSideMove())
 			cmd:SetSideMove(0)
-			cmd:SetForwardMove(1000)
 	end
 
 	if ( cmd:KeyDown(IN_MOVELEFT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and !IsAiming ) then
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1+90
 			movementangletarget.y = movementanglemouse.y
+			cmd:SetForwardMove(cmd:GetSideMove()*-1)
 			cmd:SetSideMove(0)
-			cmd:SetForwardMove(1000)
 	end
 
 	if ( cmd:KeyDown(IN_BACK) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1+180
 		movementangletarget.y = movementanglemouse.y
-		cmd:SetForwardMove(1000)
+		cmd:SetForwardMove(cmd:GetForwardMove()*-1)
 			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
 				movementangletarget.y = movementanglemouse.y+45
+				cmd:SetForwardMove(cmd:GetSideMove())
 				cmd:SetSideMove(0)
-				cmd:SetForwardMove(1000)
 					elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 						movementangletarget.y = movementanglemouse.y-45
+						cmd:SetForwardMove(cmd:GetSideMove()*-1)
 						cmd:SetSideMove(0)
-						cmd:SetForwardMove(1000)
 			end
 	end
 
@@ -324,6 +353,8 @@ function gtp:Toggle()
 	end
 end
 
+
+-- Spawnmenu GUI
 if CLIENT then
 
 	local function SettingsPanel( Panel )
@@ -353,7 +384,7 @@ if CLIENT then
 		params.Max = 1000
 		params.Command = "gtp_viewdistance"
 		Panel:AddControl( "Slider", params )
-		Panel:ControlHelp("Hint: You can also use ALT+Scrollwheel to change the view distance on the fly")
+		Panel:ControlHelp("Hint: You can also use Alt+Scrollwheel to change the view distance on the fly")
 		
 		local params = {}
 		params.Label = "Turning Speed:"
@@ -373,6 +404,9 @@ if CLIENT then
 		Panel:AddControl( "Slider", params )
 		Panel:ControlHelp("Sets the amount of time your player character aims for (in seconds)")
 		
+		Panel:CheckBox("Toggle Aiming:","gtp_toggleaim")
+		Panel:ControlHelp("RMB toggles aiming")
+		
 		local params = {}
 		params.Label = "Field of View:"
 		params.Type = "Float" 
@@ -385,7 +419,7 @@ if CLIENT then
 	end
 
 	local function creategtpmenu()
-		spawnmenu.AddToolMenuOption("Utilities", "Gamechanger", "gtpsettings", "Thirdperson Settings", "", "", SettingsPanel)
+		spawnmenu.AddToolMenuOption("Utilities", "Gamechanger", "gtpsettings", "GTP Settings", "", "", SettingsPanel)
 	end
 	
 	hook.Add( "PopulateToolMenu", "gtpmenus", creategtpmenu)
