@@ -23,14 +23,13 @@ local IsAiming = false
 local AllowZoom = false
 local IsPhysgunRotating = false
 local AimIsToggled = false
-local toggleaim = false
-
 local viewzoomset = CreateConVar("gtp_viewdistance","140",FCVAR_ARCHIVE)
 local viewheightset = CreateConVar("gtp_viewheight","2",FCVAR_ARCHIVE)
 local viewrightset = CreateConVar("gtp_viewright","20",FCVAR_ARCHIVE)
 local turnspeedset = CreateConVar("gtp_turnspeed","4",FCVAR_ARCHIVE)
 local aimtimeset = CreateConVar("gtp_aimtime","3",FCVAR_ARCHIVE)
 local setfov = CreateConVar("gtp_fov","4",FCVAR_ARCHIVE)
+local toggleaim = CreateConVar("gtp_toggleaim","false",FCVAR_ARCHIVE)
 
 local DisabledMoveTypes = {
 	[MOVETYPE_FLY] = true,
@@ -47,12 +46,13 @@ concommand.Add("gtp_toggle", function()
 	movementanglefinal.x = plyeyeangs.x
 	mousemove.x = plyeyeangs.y*-1
 	mousemove.y = plyeyeangs.x
+	IsAiming = false
 end)
 		
 function SetToggleAim( ply, cmd, args )
 	if args[1] then
 		local boolinput = tobool( args[1] )
-		toggleaim = boolinput
+		toggleaim:SetBool( boolinput )
 	end
 end
 
@@ -124,6 +124,7 @@ function GCCalcView( ply, pos, angles, fov )
 	local view = {}
 	local dist = viewzoomset:GetFloat() -- view distance
 	
+	
 	-- offset calcview camera using player's original view
 	angles.y = ( angles.y - playerangles.y - mousemove.x )
 	angles.x = ( angles.x - playerangles.x + mousemove.y )
@@ -152,16 +153,7 @@ function GCCalcView( ply, pos, angles, fov )
 	gcvang = angles
 	gcvpos = pos
 	gcvdist = dist
-	
-	-- FUCKING HELP ME, I'M BEING FORCED TO WRITE SPAGHETTI CODE, THIS SHIT SHOULD NOT BE IN HERE AT ALL BUT IT DOESN'T WORK OTHERWISE
-	if ( ply:KeyPressed(IN_ATTACK2) ) and ( toggleaim ) and ( !AimIsToggled ) then
-			IsAiming = true
-			AimIsToggled = true
-	elseif ( ply:KeyPressed(IN_ATTACK2) ) and ( toggleaim ) and ( AimIsToggled ) then
-			IsAiming = false
-			AimIsToggled = false
-	end
-	
+
 	return view
 
 end
@@ -188,14 +180,13 @@ function GCCreateMove( cmd )
 		mouse.y = 0
 	end
 	
-	if ( !AimIsToggled ) and ( cmd:KeyDown(IN_ATTACK) ) or ( ( cmd:KeyDown(IN_ATTACK2) )  and ( !toggleaim ) ) then
+	if ( !AimIsToggled ) and ( cmd:KeyDown(IN_ATTACK) ) or ( cmd:KeyDown(IN_ATTACK2) and not ( toggleaim:GetBool() ) ) then
 		IsAiming = true
 		aimtime = CurTime() + aimtimeset:GetFloat()
-		print(toggleaim)
 	elseif ( !AimIsToggled ) and ( aimtime < CurTime() ) then
 		IsAiming = false
 	end
-	
+
 	if ( cmd:KeyDown(IN_WALK) ) then
 		AllowZoom = true
 	else
@@ -327,6 +318,19 @@ function GCBindPress( ply, bind, pressed )
 	end
 end
 
+function GCKeyPress( ply, key )
+	if not IsFirstTimePredicted() then return end
+	if not IsValid( ply ) or ply != LocalPlayer() then return end
+	
+	if  ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( !AimIsToggled ) then
+			IsAiming = true
+			AimIsToggled = true
+	elseif ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( AimIsToggled ) then
+			IsAiming = false
+			AimIsToggled = false
+	end
+end
+
 function gtp:Enable()
 	IsEnabled = true
 	print("attempting to create gtp hooks")
@@ -334,6 +338,7 @@ function gtp:Enable()
 	hook.Add( "CalcView", "GCCalcView", GCCalcView )
 	hook.Add( "HUDPaint","Crosshair", GCCrosshair )
 	hook.Add( "PlayerBindPress", "GCBindPress", GCBindPress )
+	hook.Add( "KeyPress" , "GCKeyPress", GCKeyPress )
 end
 
 function gtp:Disable()
@@ -343,6 +348,7 @@ function gtp:Disable()
 	hook.Remove( "CalcView", "GCCalcView", GCCalcView )
 	hook.Remove( "HUDPaint","Crosshair", GCCrosshair )
 	hook.Remove( "PlayerBindPress", "GCBindPress", GCBindPress )
+	hook.Remove( "KeyPress" , "GCKeyPress", GCKeyPress )	
 end
 
 function gtp:Toggle()
@@ -404,8 +410,8 @@ if CLIENT then
 		Panel:AddControl( "Slider", params )
 		Panel:ControlHelp("Sets the amount of time your player character aims for (in seconds)")
 		
-		Panel:CheckBox("Toggle Aiming:","gtp_toggleaim")
-		Panel:ControlHelp("RMB toggles aiming")
+		Panel:CheckBox("Toggle Aim on RMB Click:","gtp_toggleaim")
+		Panel:ControlHelp("Aim is toggled on click instead of operating on a timer")
 		
 		local params = {}
 		params.Label = "Field of View:"
