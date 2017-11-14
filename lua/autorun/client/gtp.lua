@@ -10,7 +10,6 @@ mousemove.y = 0
 local mousewheel = 0
 local aimtime = 0 
 local gcvdist = 0
-local setfov = 4 -- fov defaults to this when the script loads
 local sideang = (Angle(0,0,0))
 local movementanglefinal = (Angle(0,0,0))
 local movementangletarget = (Angle(0,0,0))
@@ -124,6 +123,7 @@ function GCCalcView( ply, pos, angles, fov )
 	local view = {}
 	local dist = viewzoomset:GetFloat() -- view distance
 	
+	if ( !ply:Alive() ) then return end
 	
 	-- offset calcview camera using player's original view
 	angles.y = ( angles.y - playerangles.y - mousemove.x )
@@ -319,7 +319,7 @@ function GCBindPress( ply, bind, pressed )
 end
 
 function GCKeyPress( ply, key )
-	if not IsFirstTimePredicted() then return end
+	if SERVER and not IsFirstTimePredicted() then return end
 	if not IsValid( ply ) or ply != LocalPlayer() then return end
 	
 	if  ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( !AimIsToggled ) then
