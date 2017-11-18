@@ -11,6 +11,10 @@ mousemove.x = 0
 mousemove.y = 0
 local mousewheel = 0
 local aimtime = 0 
+local aimfov = 20
+local aimfovtemp = 0
+local aimdist = 0
+local aimdisttemp = 0
 local gcvdist = 0
 local sideang = (Angle(0,0,0))
 local movementanglefinal = (Angle(0,0,0))
@@ -30,6 +34,8 @@ local viewrightset = CreateConVar("gtp_viewright","20",FCVAR_ARCHIVE)
 local turnspeedset = CreateConVar("gtp_turnspeed","4",FCVAR_ARCHIVE)
 local aimtimeset = CreateConVar("gtp_aimtime","3",FCVAR_ARCHIVE)
 local setfov = CreateConVar("gtp_fov","4",FCVAR_ARCHIVE)
+local setaimfov = CreateConVar("gtp_aimfov","20",FCVAR_ARCHIVE)
+local setaimdist = CreateConVar("gtp_aimdist","50",FCVAR_ARCHIVE)
 local toggleaim = CreateConVar("gtp_toggleaim","false",FCVAR_ARCHIVE)
 
 local DisabledMoveTypes = {
@@ -50,7 +56,7 @@ concommand.Add("gtp_toggle", function()
 	IsAiming = false
 end)
 		
-local function SetToggleAim( ply, cmd, args )
+function SetToggleAim( ply, cmd, args )
 	if args[1] then
 		local boolinput = tobool( args[1] )
 		toggleaim:SetBool( boolinput )
@@ -59,7 +65,7 @@ end
 
 concommand.Add("gtp_toggleaim", SetToggleAim )
 	
-local function SetViewDistance( ply, cmd, args )
+function SetViewDistance( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
 		viewzoomset:SetFloat( numberinput )
@@ -68,7 +74,7 @@ end
 
 concommand.Add( "gtp_viewdistance", SetViewDistance )
 
-local function SetTurnSpeed( ply, cmd, args )
+function SetTurnSpeed( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
 		turnspeedset = numberinput
@@ -77,7 +83,7 @@ end
 
 concommand.Add( "gtp_turnspeed", SetTurnSpeed )
 
-local function SetAimTime( ply, cmd, args )
+function SetAimTime( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
 		aimtimeset = numberinput
@@ -86,7 +92,7 @@ end
 
 concommand.Add( "gtp_aimtime", SetAimTime )
 
-local function SetViewHeight( ply, cmd, args )
+function SetViewHeight( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
 		viewheightset = numberinput
@@ -95,7 +101,7 @@ end
 
 concommand.Add( "gtp_viewheight", SetViewHeight )
 
-local function SetViewRight( ply, cmd, args )
+function SetViewRight( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
 		viewrightset = numberinput
@@ -104,7 +110,7 @@ end
 
 concommand.Add( "gtp_viewright", SetViewRight )
 
-local function SetFOV( ply, cmd, args )
+function SetFOV( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
 		setfov = numberinput
@@ -113,7 +119,26 @@ end
 
 concommand.Add( "gtp_fov", SetFOV )
 
-local function ConvertAim(from, to)
+function SetAimFOV( ply, cmd, args )
+	if args[1] then
+		local numberinput = tonumber( args[1] )
+		setaimfov = numberinput
+	end
+end
+
+concommand.Add( "gtp_aimfov", SetAimFOV)
+
+function SetAimDist( ply, cmd, args )
+	if args[1] then
+		local numberinput = tonumber( args[1] )
+		setaimdist = numberinput
+	end
+end
+
+concommand.Add( "gtp_aimdist", SetAimDist )
+
+
+function ConvertAim(from, to)
 	local ang = to - from
 
 	return ang:Angle()
@@ -123,7 +148,7 @@ local function GCCalcView( ply, pos, angles, fov )
 
 	local trace = {}
 	local view = {}
-	local dist = viewzoomset:GetFloat() -- view distance
+	local dist = ( viewzoomset:GetFloat() ) -aimdist -- view distance
 	
 	if ( !ply:Alive() ) then return end
 	
@@ -149,7 +174,7 @@ local function GCCalcView( ply, pos, angles, fov )
 	
 	view.origin = pos - ( angles:Forward() *dist ) + ( angles:Right() *viewrightset:GetFloat() ) + ( angles:Up() *viewheightset:GetFloat() )
 	view.angles = angles
-	view.fov = fov -setfov:GetFloat()
+	view.fov = fov -setfov:GetFloat() -aimfov
 	view.drawviewer = true
 	
 	gcvang = angles
@@ -167,7 +192,11 @@ local function GCCreateMove( cmd )
 	
 	if ( !ply:Alive() ) then return end
 	
+	aimfov = Lerp(0.1, aimfov, aimfovtemp)
+	aimdist = Lerp(0.1, aimdist, aimdisttemp)
+	
 	-- The crosshair hitpos trace is in here because it is less responsive in the calcview function.
+	
 	trace.start = gcvpos - ( gcvang:Forward() *gcvdist ) + ( gcvang:Right() *viewrightset:GetFloat() ) + ( gcvang:Up() *viewheightset:GetFloat() )
 	trace.endpos = gcvang:Forward() *2147483647 
 	trace.filter = LocalPlayer()
@@ -189,6 +218,14 @@ local function GCCreateMove( cmd )
 	elseif ( !AimIsToggled ) and ( aimtime < CurTime() ) then
 		IsAiming = false
 	end
+	
+	if ( AimIsToggled ) then
+		aimfovtemp = setaimfov:GetFloat()
+		aimdisttemp = setaimdist:GetFloat()
+	elseif ( !AimIsToggled ) then
+		aimfovtemp = 0
+		aimdisttemp = 0
+	end
 
 	if ( cmd:KeyDown(IN_WALK) ) then
 		AllowZoom = true
@@ -201,7 +238,6 @@ local function GCCreateMove( cmd )
 	else
 		IsPhysgunRotating = false
 	end
-
 
 	if ( cmd:KeyDown(IN_FORWARD) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
@@ -252,10 +288,10 @@ local function GCCreateMove( cmd )
 
 	-- for some reason, having this mouse stuff in here instead of in the calcview function makes it work much better. So don't touch this stuff.
 	-- TODO: add variables to change mouse sensitiviy in these (currently dictated by the /35's)
-	mousemove.x = math.Clamp( mouse.x /35 + mousemove.x, -360, 360)
+	mousemove.x = math.Clamp( mouse.x /(35+aimfov) + mousemove.x, -360, 360)
 	if ( mousemove.x == 360 ) or ( mousemove.x == -360 ) then mousemove.x = 0 end
 	
-	mousemove.y = math.Clamp( mouse.y /35 + mousemove.y, -60, 89 )
+	mousemove.y = math.Clamp( mouse.y /(35+aimfov) + mousemove.y, -60, 89 )
 	
 	if ( AllowZoom ) then 
 		mousewheel = cmd:GetMouseWheel()
@@ -292,27 +328,17 @@ local function GCCreateMove( cmd )
 	return true
 end
 
--- Should probably do something with this. Enable the crosshair while aiming? Make it customizable?
-local function GCCrosshair()
-
-	local p = LocalPlayer():GetEyeTrace().HitPos:ToScreen()
-	local x,y = p.x, p.y
-	 
-	--set the drawcolor
-	if ( IsAiming ) then
-		surface.SetDrawColor( 255, 255, 255, 0 )
-		else 
+function GCCrosshair()
+	
+	if	( IsAiming ) then
+		surface.SetDrawColor( 255, 255, 255, 255 )
+	else
 		surface.SetDrawColor( 255, 255, 255, 0 )
 	end
-	 
-	local gap = 5
-	local length = gap + 15
-	 
-	--draw the crosshair
-	surface.DrawLine( x - length, y, x - gap, y )
-	surface.DrawLine( x + length, y, x + gap, y )
-	surface.DrawLine( x, y - length, x, y - gap )
-	surface.DrawLine( x, y + length, x, y + gap )
+	
+	surface.SetTexture(surface.GetTextureID("crosshair/gtp_crosshair"))
+	surface.DrawTexturedRect( ScrW()/2 - 10, ScrH()/2 - 10, 20, 20 )
+
 	
 end
 
@@ -333,21 +359,22 @@ local function GCKeyPress( ply, key )
 	elseif ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( AimIsToggled ) then
 			IsAiming = false
 			AimIsToggled = false
+			aimfov = Lerp(0.5, 0, aimfov)
 	end
 end
 
--- TODO: Add hook checks for health & safety reasons. Also add hook checks for CTP and STP and maybe the PAC camera for compatibility reasons.
-local function gtp:Enable()
+-- TODO: Add hook checks for health & safety reasons. Also add hook checks for CTP and STP and maybe the PAC camera for compatibility.
+function gtp:Enable()
 	IsEnabled = true
 	print("attempting to create gtp hooks")
 	hook.Add( "CreateMove", "GCCreateMove", GCCreateMove )
 	hook.Add( "CalcView", "GCCalcView", GCCalcView )
-	hook.Add( "HUDPaint","Crosshair", GCCrosshair )
 	hook.Add( "PlayerBindPress", "GCBindPress", GCBindPress )
 	hook.Add( "KeyPress" , "GCKeyPress", GCKeyPress )
+	hook.Add( "HUDPaint","Crosshair", GCCrosshair )
 end
 
-local function gtp:Disable()
+function gtp:Disable()
 	IsEnabled = false
 	print("attempting to remove gtp hooks")
 	hook.Remove( "CreateMove", "GCCreateMove", GCCreateMove )
@@ -357,7 +384,7 @@ local function gtp:Disable()
 	hook.Remove( "KeyPress" , "GCKeyPress", GCKeyPress )	
 end
 
-local function gtp:Toggle()
+function gtp:Toggle()
 	if ( IsEnabled ) then
 			gtp:Disable()
 	else
