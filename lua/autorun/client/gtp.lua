@@ -77,7 +77,7 @@ concommand.Add( "gtp_viewdistance", SetViewDistance )
 function SetTurnSpeed( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		turnspeedset = numberinput
+		turnspeedset:SetFloat(numberinput)
 	end
 end
 
@@ -86,7 +86,7 @@ concommand.Add( "gtp_turnspeed", SetTurnSpeed )
 function SetAimTime( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		aimtimeset = numberinput
+		aimtimeset:SetFloat(numberinput)
 	end
 end
 
@@ -95,7 +95,7 @@ concommand.Add( "gtp_aimtime", SetAimTime )
 function SetViewHeight( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		viewheightset = numberinput
+		viewheightset:SetFloat(numberinput)
 	end
 end
 
@@ -104,7 +104,7 @@ concommand.Add( "gtp_viewheight", SetViewHeight )
 function SetViewRight( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		viewrightset = numberinput
+		viewrightset:SetFloat(numberinput)
 	end
 end
 
@@ -113,7 +113,7 @@ concommand.Add( "gtp_viewright", SetViewRight )
 function SetFOV( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		setfov = numberinput
+		setfov:SetFloat(numberinput)
 	end
 end
 
@@ -122,7 +122,7 @@ concommand.Add( "gtp_fov", SetFOV )
 function SetAimFOV( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		setaimfov = numberinput
+		setaimfov:SetFloat(numberinput)
 	end
 end
 
@@ -131,7 +131,7 @@ concommand.Add( "gtp_aimfov", SetAimFOV)
 function SetAimDist( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
-		setaimdist = numberinput
+		setaimdist:SetFloat(numberinput)
 	end
 end
 
@@ -211,8 +211,8 @@ local function GCCreateMove( cmd )
 		mouse.y = 0
 	end
 	
-	-- ((((((parentheses hell)))))))
-	if ( !AimIsToggled and cmd:KeyDown(IN_ATTACK) ) or ( cmd:KeyDown(IN_ATTACK2) and not toggleaim:GetBool() ) then
+	-- ((((((parentheses hell)))))))	
+	if ( !AimIsToggled and cmd:KeyDown(IN_ATTACK) ) then
 		IsAiming = true
 		aimtime = CurTime() + aimtimeset:GetFloat()
 	elseif ( !AimIsToggled ) and ( aimtime < CurTime() ) then
@@ -226,7 +226,20 @@ local function GCCreateMove( cmd )
 		aimfovtemp = 0
 		aimdisttemp = 0
 	end
-
+	
+	if ( !AimIsToggled and cmd:KeyDown(IN_ATTACK2) and !toggleaim:GetBool() ) then
+		aimfovtemp = setaimfov:GetFloat()
+		aimdisttemp = setaimdist:GetFloat()
+		IsAiming = true
+	elseif ( !AimIsToggled ) and ( aimtime < CurTime() and !toggleaim:GetBool() ) then
+		IsAiming = false
+	end
+	
+	if ( !toggleaim:GetBool() and AimIsToggled and IsAiming ) then
+		AimIsToggled = false
+		IsAiming = false
+	end
+	
 	if ( cmd:KeyDown(IN_WALK) ) then
 		AllowZoom = true
 	else
@@ -337,7 +350,7 @@ function GCCrosshair()
 	end
 	
 	surface.SetTexture(surface.GetTextureID("crosshair/gtp_crosshair"))
-	surface.DrawTexturedRect( ScrW()/2 - 10, ScrH()/2 - 10, 20, 20 )
+	surface.DrawTexturedRect( ScrW()/2 - 7, ScrH()/2 - 5, 12, 12 )
 
 	
 end
@@ -350,7 +363,7 @@ local function GCBindPress( ply, bind, pressed )
 end
 
 local function GCKeyPress( ply, key )
-	if SERVER and not IsFirstTimePredicted() then return end
+	if not ( game.SinglePlayer() ) and not IsFirstTimePredicted() then return end
 	if not IsValid( ply ) or ply != LocalPlayer() then return end
 	
 	if  ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( !AimIsToggled ) then
@@ -443,6 +456,24 @@ if CLIENT then
 		params.Command = "gtp_aimtime"
 		Panel:AddControl( "Slider", params )
 		Panel:ControlHelp("Sets the amount of time your player character aims for (in seconds)")
+		
+		local params = {}
+		params.Label = "Aiming Distance:"
+		params.Type = "Float" 
+		params.Min = -100
+		params.Max = 100
+		params.Command = "gtp_aimdist"
+		Panel:AddControl( "Slider", params )
+		Panel:ControlHelp("Sets the aiming distance")
+		
+		local params = {}
+		params.Label = "Aiming Field of View:"
+		params.Type = "Float" 
+		params.Min = -100
+		params.Max = 100
+		params.Command = "gtp_aimfov"
+		Panel:AddControl( "Slider", params )
+		Panel:ControlHelp("Sets the aiming FoV")
 		
 		Panel:CheckBox("Toggle Aim on RMB Click:","gtp_toggleaim")
 		Panel:ControlHelp("Aim is toggled on click instead of operating on a timer")
