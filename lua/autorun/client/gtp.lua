@@ -37,6 +37,7 @@ local setfov = CreateConVar("gtp_fov","4",FCVAR_ARCHIVE)
 local setaimfov = CreateConVar("gtp_aimfov","20",FCVAR_ARCHIVE)
 local setaimdist = CreateConVar("gtp_aimdist","50",FCVAR_ARCHIVE)
 local toggleaim = CreateConVar("gtp_toggleaim","false",FCVAR_ARCHIVE)
+local togglecrosshair = CreateConVar("gtp_togglecrosshair","false",FCVAR_ARCHIVE)
 
 local DisabledMoveTypes = {
 	[MOVETYPE_FLY] = true,
@@ -53,7 +54,6 @@ concommand.Add("gtp_toggle", function()
 	movementanglefinal.x = plyeyeangs.x
 	mousemove.x = plyeyeangs.y*-1
 	mousemove.y = plyeyeangs.x
-	IsAiming = false
 end)
 		
 function SetToggleAim( ply, cmd, args )
@@ -64,6 +64,15 @@ function SetToggleAim( ply, cmd, args )
 end
 
 concommand.Add("gtp_toggleaim", SetToggleAim )
+
+function SetToggleCrosshair( ply, cmd, args )
+	if args[1] then
+		local boolinput = tobool( args[1] )
+		togglecrosshair:SetBool( boolinput )
+	end
+end
+
+concommand.Add("gtp_togglecrosshair", SetToggleCrosshair )
 	
 function SetViewDistance( ply, cmd, args )
 	if args[1] then
@@ -343,7 +352,7 @@ end
 
 function GCCrosshair()
 	
-	if	( IsAiming ) then
+	if ( IsAiming and togglecrosshair:GetBool() ) then
 		surface.SetDrawColor( 255, 255, 255, 255 )
 	else
 		surface.SetDrawColor( 255, 255, 255, 0 )
@@ -351,8 +360,15 @@ function GCCrosshair()
 	
 	surface.SetTexture(surface.GetTextureID("crosshair/gtp_crosshair"))
 	surface.DrawTexturedRect( ScrW()/2 - 7, ScrH()/2 - 5, 12, 12 )
-
 	
+end
+
+function HideDefaultCrosshair(element)
+	if ( element == "CHudCrosshair" ) and ( togglecrosshair:GetBool() ) then
+		return false
+	elseif ( element == "CHudCrosshair" ) and ( !togglecrosshair:GetBool() ) then
+		return true
+	end
 end
 
 local function GCBindPress( ply, bind, pressed )
@@ -363,8 +379,8 @@ local function GCBindPress( ply, bind, pressed )
 end
 
 local function GCKeyPress( ply, key )
-	if not ( game.SinglePlayer() ) and not IsFirstTimePredicted() then return end
-	if not IsValid( ply ) or ply != LocalPlayer() then return end
+	if !game.SinglePlayer() and !IsFirstTimePredicted() then return end
+	if !IsValid( ply ) or ply != LocalPlayer() then return end
 	
 	if  ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( !AimIsToggled ) then
 			IsAiming = true
@@ -385,6 +401,7 @@ function gtp:Enable()
 	hook.Add( "PlayerBindPress", "GCBindPress", GCBindPress )
 	hook.Add( "KeyPress" , "GCKeyPress", GCKeyPress )
 	hook.Add( "HUDPaint","Crosshair", GCCrosshair )
+	hook.Add( "HUDShouldDraw", "HideDefaultCrosshair", HideDefaultCrosshair )
 end
 
 function gtp:Disable()
@@ -394,7 +411,8 @@ function gtp:Disable()
 	hook.Remove( "CalcView", "GCCalcView", GCCalcView )
 	hook.Remove( "HUDPaint","Crosshair", GCCrosshair )
 	hook.Remove( "PlayerBindPress", "GCBindPress", GCBindPress )
-	hook.Remove( "KeyPress" , "GCKeyPress", GCKeyPress )	
+	hook.Remove( "KeyPress" , "GCKeyPress", GCKeyPress )
+	hook.Remove( "HUDShouldDraw", "HideDefaultCrosshair", HideDefaultCrosshair )
 end
 
 function gtp:Toggle()
@@ -478,6 +496,9 @@ if CLIENT then
 		Panel:CheckBox("Toggle Aim on RMB Click:","gtp_toggleaim")
 		Panel:ControlHelp("Aim is toggled on click instead of operating on a timer")
 		
+		Panel:CheckBox("Use custom crosshair:","gtp_togglecrosshair")
+		Panel:ControlHelp("Use GTP's crosshair instead of default; only appears when aiming")
+		
 		local params = {}
 		params.Label = "Field of View:"
 		params.Type = "Float" 
@@ -485,7 +506,7 @@ if CLIENT then
 		params.Max = 100
 		params.Command = "gtp_fov"
 		Panel:AddControl( "Slider", params )
-		Panel:ControlHelp("Sets the thirdperson FOV (current numbers are dumb, I know, will be fixed later)")
+		Panel:ControlHelp("Sets the overall thirdperson FOV (current numbers are dumb, I know, will be fixed later)")
 		
 	end
 
