@@ -65,6 +65,7 @@ concommand.Add("gtp_toggle", function()
 	movementanglefinal.x = plyeyeangs.x
 	mousemove.x = plyeyeangs.y*-1
 	mousemove.y = plyeyeangs.x
+	autoturn = mousemove.x
 end)
 		
 function SetToggleRMBAim( ply, cmd, args )
