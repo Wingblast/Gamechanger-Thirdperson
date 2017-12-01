@@ -308,7 +308,6 @@ local function GCCreateMove( cmd )
 	end
 	
 	if ( toggleaim:GetBool() ) and ( !AimIsToggled ) then
-		AimIsToggled = true
 		IsAiming = true
 	end
 	
@@ -502,7 +501,6 @@ end
 local function GCKeyPress( ply, key )
 	if !game.SinglePlayer() and !IsFirstTimePredicted() then return end
 	if !IsValid( ply ) or ply != LocalPlayer() then return end
-	if toggleaim:GetBool() then return end
 	
 	if  ( key == IN_ATTACK2 ) and ( togglermbaim:GetBool() ) and ( !AimIsToggled ) then
 			IsAiming = true
