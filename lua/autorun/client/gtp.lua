@@ -381,12 +381,12 @@ local function GCCreateMove( cmd )
 		cmd:SetForwardMove(cmd:GetForwardMove()*-1)
 		if not ( cmd:KeyDown(IN_MOVELEFT) or cmd:KeyDown(IN_MOVERIGHT) ) then
 			if ( LastKeyRight ) then
-			autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat())
+			autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat()*1.5)
 				if autoturn > 360 then 
 					autoturn = autoturn -360
 				end
 			else
-			autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat())
+			autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat()*1.5)
 				if autoturn > 360 then 
 					autoturn = autoturn -360
 				end
@@ -397,7 +397,7 @@ local function GCCreateMove( cmd )
 				movementangletarget.y = movementanglemouse.y+45
 				cmd:SetForwardMove(cmd:GetSideMove())
 				cmd:SetSideMove(0)
-				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat()/2)
+				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat()*1.5)
 					if autoturn > 360 then 
 						autoturn = autoturn -360
 					end
@@ -406,7 +406,7 @@ local function GCCreateMove( cmd )
 						movementangletarget.y = movementanglemouse.y-45
 						cmd:SetForwardMove(cmd:GetSideMove()*-1)
 						cmd:SetSideMove(0)
-						autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat()/2)
+						autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat()*1.5)
 							if autoturn > 360 then 
 								autoturn = autoturn -360
 							end
