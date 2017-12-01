@@ -322,7 +322,7 @@ local function GCCreateMove( cmd )
 	else
 		IsPhysgunRotating = false
 	end
-
+	-- main movement system
 	if ( cmd:KeyDown(IN_FORWARD) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1
@@ -333,18 +333,12 @@ local function GCCreateMove( cmd )
 				cmd:SetForwardMove(cmd:GetSideMove())
 				cmd:SetSideMove(0)
 				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat()/2)
-					if autoturn > 360 then 
-						autoturn = autoturn -360
-					end
 						elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 							LastKeyRight = false
 							movementangletarget.y = movementanglemouse.y+45
 							cmd:SetForwardMove(cmd:GetSideMove()*-1)
 							cmd:SetSideMove(0)
 							autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat()/2)
-							if autoturn < -360 then 
-								autoturn = autoturn +360
-							end
 			end
 	end
 
@@ -356,9 +350,6 @@ local function GCCreateMove( cmd )
 			cmd:SetForwardMove(cmd:GetSideMove())
 			cmd:SetSideMove(0)
 			autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat())
-			if autoturn > 360 then 
-				autoturn = autoturn -360
-			end
 	end
 
 	if ( cmd:KeyDown(IN_MOVELEFT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and !IsAiming ) then
@@ -369,9 +360,6 @@ local function GCCreateMove( cmd )
 			cmd:SetForwardMove(cmd:GetSideMove()*-1)
 			cmd:SetSideMove(0)
 			autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat())
-			if autoturn < -360 then 
-				autoturn = autoturn +360
-			end
 	end
 
 	if ( cmd:KeyDown(IN_BACK) and !IsAiming ) then
@@ -381,15 +369,9 @@ local function GCCreateMove( cmd )
 		cmd:SetForwardMove(cmd:GetForwardMove()*-1)
 		if not ( cmd:KeyDown(IN_MOVELEFT) or cmd:KeyDown(IN_MOVERIGHT) ) then
 			if ( LastKeyRight ) then
-			autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat()*1.5)
-				if autoturn > 360 then 
-					autoturn = autoturn -360
-				end
+				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat()*1.5)
 			else
-			autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat()*1.5)
-				if autoturn > 360 then 
-					autoturn = autoturn -360
-				end
+				autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat()*1.5)
 			end
 		end
 			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
@@ -398,28 +380,28 @@ local function GCCreateMove( cmd )
 				cmd:SetForwardMove(cmd:GetSideMove())
 				cmd:SetSideMove(0)
 				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, autoturnspeedset:GetFloat()*1.5)
-					if autoturn > 360 then 
-						autoturn = autoturn -360
-					end
 					elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 						LastKeyRight = false
 						movementangletarget.y = movementanglemouse.y-45
 						cmd:SetForwardMove(cmd:GetSideMove()*-1)
 						cmd:SetSideMove(0)
 						autoturn = math.ApproachAngle( autoturn, mousemove.x-80, autoturnspeedset:GetFloat()*1.5)
-							if autoturn > 360 then 
-								autoturn = autoturn -360
-							end
 			end
 	end
 	
-	-- Auto Turn Timer
+	-- Auto-Turn stuff
 	if ( cmd:GetMouseX() ~= 0 or cmd:GetMouseY() ~= 0 ) then
 		autoturntimer = CurTime() + autoturntimeset:GetFloat() -- put concommand for autoturn timer
 	end
 	
 	if ( autoturntimer > CurTime() ) then
 		autoturn = mousemove.x
+	end
+	
+	if autoturn > 360 then 
+		autoturn = autoturn -360
+	elseif autoturn < -360 then
+		autoturn = autoturn +360
 	end
 
 	-- for some reason, having this mouse stuff in here instead of in the calcview function makes it work much better. So don't touch this stuff.
@@ -448,7 +430,7 @@ local function GCCreateMove( cmd )
 		movementanglefinal.y = neweyeangs.y
 		movementanglefinal.x = neweyeangs.x
 		
-		-- allows for the character's movement angles to remain unchanged while aiming
+		-- allows for the character's movement angles to appear unchanged while aiming
 		if ( !DisabledMoveTypes[ply:GetMoveType()] ) then 
 			movementvector = Vector( cmd:GetForwardMove(), cmd:GetSideMove(), cmd:GetUpMove() )
 			movementvector:Rotate( cmd:GetViewAngles() - sideang )
