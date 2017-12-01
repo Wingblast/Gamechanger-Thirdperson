@@ -428,7 +428,7 @@ local function GCCreateMove( cmd )
 	if ( mousemove.x == 360 ) or ( mousemove.x == -360 ) then mousemove.x = 0 end
 	
 	if ( autoturntimer < CurTime() ) and ( toggleautoturn:GetBool() ) then
-		mousemove.x = CLerp( mousemove.x, autoturn, 0.03 )
+		mousemove.x = CLerp( mousemove.x, autoturn, 0.07 )
 	end
 	
 
