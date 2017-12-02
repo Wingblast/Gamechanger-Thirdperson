@@ -620,7 +620,7 @@ if CLIENT then
 		Panel:ControlHelp("Aim is toggled on RMB click")
 		
 		Panel:CheckBox("Always have Aim Toggled:","gtp_toggleaim")
-		Panel:ControlHelp("Permanantly toggles aiming if checked")
+		Panel:ControlHelp("Permanently toggles aiming if checked")
 		
 		Panel:CheckBox("Use custom crosshair:","gtp_togglecrosshair")
 		Panel:ControlHelp("Use GTP's crosshair instead of default; only appears when aiming")
