@@ -22,6 +22,9 @@ local aimdisttemp = 0
 local gcvdist = 0
 local autoturn = 0
 local autoturntimer = 0
+local gtp_poseparam_headyaw
+local gtp_poseparam_headyaw_old = 0
+local gtp_poseparam_headyaw_final = 0
 local sideang = (Angle(0,0,0))
 local movementanglefinal = (Angle(0,0,0))
 local movementangletarget = (Angle(0,0,0))
@@ -35,6 +38,7 @@ local AllowZoom = false
 local IsPhysgunRotating = false
 local AimIsToggled = false
 local LastKeyRight = false
+local PlayerIsMoving = false
 local viewzoomset = CreateConVar("gtp_viewdistance","140",FCVAR_ARCHIVE)
 local viewheightset = CreateConVar("gtp_viewheight","2",FCVAR_ARCHIVE)
 local viewrightset = CreateConVar("gtp_viewright","20",FCVAR_ARCHIVE)
@@ -43,8 +47,12 @@ local aimtimeset = CreateConVar("gtp_aimtime","3",FCVAR_ARCHIVE)
 local setfov = CreateConVar("gtp_fov","4",FCVAR_ARCHIVE)
 local setaimfov = CreateConVar("gtp_aimfov","20",FCVAR_ARCHIVE)
 local setaimdist = CreateConVar("gtp_aimdist","50",FCVAR_ARCHIVE)
+local autoturnspeedset = CreateConVar("gtp_autoturnspeed","2",FCVAR_ARCHIVE)
+local autoturntimeset = CreateConVar("gtp_autoturntime","1",FCVAR_ARCHIVE)
+local toggleautoturn = CreateConVar("gtp_toggleautoturn","true",FCVAR_ARCHIVE)
 local toggleaim = CreateConVar("gtp_toggleaim","false",FCVAR_ARCHIVE)
-local togglecrosshair = CreateConVar("gtp_togglecrosshair","false",FCVAR_ARCHIVE)
+local togglermbaim = CreateConVar("gtp_togglermbaim","false",FCVAR_ARCHIVE)
+local togglecrosshair = CreateConVar("gtp_togglecrosshair","true",FCVAR_ARCHIVE)
 
 local DisabledMoveTypes = {
 	[MOVETYPE_FLY] = true,
@@ -61,8 +69,18 @@ concommand.Add("gtp_toggle", function()
 	movementanglefinal.x = plyeyeangs.x
 	mousemove.x = plyeyeangs.y*-1
 	mousemove.y = plyeyeangs.x
+	autoturn = mousemove.x
 end)
 		
+function SetToggleRMBAim( ply, cmd, args )
+	if args[1] then
+		local boolinput = tobool( args[1] )
+		togglermbaim:SetBool( boolinput )
+	end
+end
+
+concommand.Add("gtp_togglermbaim", SetToggleRMBAim )
+
 function SetToggleAim( ply, cmd, args )
 	if args[1] then
 		local boolinput = tobool( args[1] )
@@ -153,6 +171,24 @@ end
 
 concommand.Add( "gtp_aimdist", SetAimDist )
 
+function SetAutoTurn( ply, cmd, args )
+	if args[1] then
+		local numberinput = tonumber( args[1] )
+		autoturnspeedset:SetFloat(numberinput)
+	end
+end
+
+concommand.Add( "gtp_autoturnspeed", autoturnspeedset )
+
+function SetAutoTurnTime( ply, cmd, args )
+	if args[1] then
+		local numberinput = tonumber( args[1] )
+		autoturntimeset:SetFloat(numberinput)
+	end
+end
+
+concommand.Add( "gtp_autoturntime", autoturntimeset )
+
 
 function ConvertAim(from, to)
 	local ang = to - from
@@ -188,7 +224,7 @@ local function GCCalcView( ply, pos, angles, fov )
 	if ( !ply:Alive() ) then return end
 	
 	-- offset calcview camera using player's original view
-	angles.y = ( angles.y - playerangles.y - mousemove.x )
+	angles.y = mousemove.x*-1
 	angles.x = ( angles.x - playerangles.x + mousemove.y )
 	
 	local tmpang = Angle(angles.p, angles.y, angles.r)
@@ -218,6 +254,54 @@ local function GCCalcView( ply, pos, angles, fov )
 
 	return view
 
+end
+
+-- Animations updated in here
+
+local function GCUpdateAnimation( ply, velocity, maxseqgroundspeed )
+
+	-- Set poseparameters on the head
+	-- Most of this stuff is just here to make it look nice
+
+	local ppeyeangs = LocalPlayer():EyeAngles()
+	
+	gtp_poseparam_headyaw = gcvang - ppeyeangs
+	gtp_poseparam_headyaw = math.NormalizeAngle( gtp_poseparam_headyaw.y )
+	gtp_poseparam_headyaw = gtp_poseparam_headyaw*1.6
+	gtp_poseparam_headyaw = gtp_poseparam_headyaw + gtp_poseparam_headyaw_old
+	
+	if ( gtp_poseparam_headyaw > 230 ) then gtp_poseparam_headyaw = 0 
+	elseif ( gtp_poseparam_headyaw < -230 ) then gtp_poseparam_headyaw = 0
+	end
+		
+	gtp_poseparam_headyaw = math.Clamp(gtp_poseparam_headyaw, -79, 79)
+
+	
+	if ( PlayerIsMoving ) and ( autoturntimer < CurTime() ) then
+		gtp_poseparam_headyaw = (gtp_poseparam_headyaw*-1)/5
+	end
+	
+	if ( PlayerIsMoving ) then 
+		gtp_poseparam_headyaw_old = 0
+	end
+	
+	gtp_poseparam_headyaw_final = Lerp( 0.91, gtp_poseparam_headyaw, gtp_poseparam_headyaw_final )
+
+	gtp_poseparam_headyaw_final = math.Round( gtp_poseparam_headyaw_final, 6)
+	
+	if !IsAiming then 
+		LocalPlayer():SetPoseParameter( "head_yaw", gtp_poseparam_headyaw_final )
+	else
+		gtp_poseparam_headyaw_old = LocalPlayer():GetPoseParameter("head_yaw")
+		gtp_poseparam_headyaw_old = math.Remap(gtp_poseparam_headyaw_old, 0, 1, -79, 79)
+		LocalPlayer():SetPoseParameter( "head_yaw", gtp_poseparam_headyaw_old*1.3 )
+	end
+
+	net.Start("gtp_poseparams_fromclient")
+	net.WriteFloat(gtp_poseparam_headyaw_final)
+	
+	net.SendToServer()
+	
 end
 
 local function GCCreateMove( cmd )
@@ -262,17 +346,21 @@ local function GCCreateMove( cmd )
 		aimdisttemp = 0
 	end
 	
-	if ( !AimIsToggled and cmd:KeyDown(IN_ATTACK2) and !toggleaim:GetBool() ) then
+	if ( !AimIsToggled and cmd:KeyDown(IN_ATTACK2) and !togglermbaim:GetBool() ) then
 		aimfovtemp = setaimfov:GetFloat()
 		aimdisttemp = setaimdist:GetFloat()
 		IsAiming = true
-	elseif ( !AimIsToggled ) and ( aimtime < CurTime() and !toggleaim:GetBool() ) then
+	elseif ( !AimIsToggled ) and ( aimtime < CurTime() and !togglermbaim:GetBool() and !toggleaim:GetBool() ) then
 		IsAiming = false
 	end
 	
-	if ( !toggleaim:GetBool() and AimIsToggled and IsAiming ) then
+	if ( !togglermbaim:GetBool() ) and ( !toggleaim:GetBool() ) and ( AimIsToggled and IsAiming ) then
 		AimIsToggled = false
 		IsAiming = false
+	end
+	
+	if ( toggleaim:GetBool() ) and ( !AimIsToggled ) then
+		IsAiming = true
 	end
 	
 	if ( cmd:KeyDown(IN_WALK) ) then
@@ -286,52 +374,45 @@ local function GCCreateMove( cmd )
 	else
 		IsPhysgunRotating = false
 	end
-
+	-- main movement system
 	if ( cmd:KeyDown(IN_FORWARD) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1
 		movementangletarget.y = movementanglemouse.y
 			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
+				LastKeyRight = true
 				movementangletarget.y = movementanglemouse.y-45
 				cmd:SetForwardMove(cmd:GetSideMove())
 				cmd:SetSideMove(0)
-				autoturn = math.ApproachAngle( autoturn, mousemove.x+(25/turnspeedset:GetFloat()), 0.15)
-					if autoturn > 360 then 
-						autoturn = autoturn -360
-					end
+				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat()/2)/50)
+
 						elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
+							LastKeyRight = false
 							movementangletarget.y = movementanglemouse.y+45
 							cmd:SetForwardMove(cmd:GetSideMove()*-1)
 							cmd:SetSideMove(0)
-							autoturn = math.ApproachAngle( autoturn, mousemove.x-(25/turnspeedset:GetFloat()), 0.15)
-							if autoturn < -360 then 
-								autoturn = autoturn +360
-							end
+							autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat()/2)/50)
 			end
 	end
 
 	if ( cmd:KeyDown(IN_MOVERIGHT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and !IsAiming ) then
+			LastKeyRight = true
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1-90
 			movementangletarget.y = movementanglemouse.y
 			cmd:SetForwardMove(cmd:GetSideMove())
 			cmd:SetSideMove(0)
-			autoturn = math.ApproachAngle( autoturn, mousemove.x+(80/turnspeedset:GetFloat()), 0.3)
-			if autoturn > 360 then 
-				autoturn = autoturn -360
-			end
+			autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat())/50)
 	end
 
 	if ( cmd:KeyDown(IN_MOVELEFT) and not cmd:KeyDown(IN_FORWARD) and not cmd:KeyDown(IN_BACK) and !IsAiming ) then
+			LastKeyRight = false
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1+90
 			movementangletarget.y = movementanglemouse.y
 			cmd:SetForwardMove(cmd:GetSideMove()*-1)
 			cmd:SetSideMove(0)
-			autoturn = math.ApproachAngle( autoturn, mousemove.x-(80/turnspeedset:GetFloat()), 0.3)
-			if autoturn < -360 then 
-				autoturn = autoturn +360
-			end
+			autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat())/50)
 	end
 
 	if ( cmd:KeyDown(IN_BACK) and !IsAiming ) then
@@ -341,15 +422,9 @@ local function GCCreateMove( cmd )
 		cmd:SetForwardMove(cmd:GetForwardMove()*-1)
 		if not ( cmd:KeyDown(IN_MOVELEFT) or cmd:KeyDown(IN_MOVERIGHT) ) then
 			if ( LastKeyRight ) then
-			autoturn = math.ApproachAngle( autoturn, mousemove.x+(80/turnspeedset:GetFloat()), 0.3)
-				if autoturn > 360 then 
-					autoturn = autoturn -360
-				end
+				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat()*1.5)/50)
 			else
-			autoturn = math.ApproachAngle( autoturn, mousemove.x-(80/turnspeedset:GetFloat()), 0.3)
-				if autoturn > 360 then 
-					autoturn = autoturn -360
-				end
+				autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat()*1.5)/50)
 			end
 		end
 			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
@@ -357,27 +432,44 @@ local function GCCreateMove( cmd )
 				movementangletarget.y = movementanglemouse.y+45
 				cmd:SetForwardMove(cmd:GetSideMove())
 				cmd:SetSideMove(0)
-				autoturn = math.ApproachAngle( autoturn, mousemove.x+(25/turnspeedset:GetFloat()), 0.15)
-					if autoturn > 360 then 
-						autoturn = autoturn -360
-					end
+				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat()*1.5)/50)
 					elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 						LastKeyRight = false
 						movementangletarget.y = movementanglemouse.y-45
 						cmd:SetForwardMove(cmd:GetSideMove()*-1)
 						cmd:SetSideMove(0)
-						autoturn = math.ApproachAngle( autoturn, mousemove.x-(25/turnspeedset:GetFloat()), 0.15)
-							if autoturn > 360 then 
-								autoturn = autoturn -360
-							end
+						autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat()*1.5)/50)
 			end
+	end
+	
+	-- Auto-Turn stuff
+	if ( cmd:GetMouseX() ~= 0 or cmd:GetMouseY() ~= 0 ) then
+		autoturntimer = CurTime() + autoturntimeset:GetFloat() -- put concommand for autoturn timer
+	end
+	
+	if ( autoturntimer > CurTime() ) then
+		autoturn = mousemove.x
+	end
+	
+	if autoturn > 360 then 
+		autoturn = autoturn -360
+	elseif autoturn < -360 then
+		autoturn = autoturn +360
 	end
 
 	-- for some reason, having this mouse stuff in here instead of in the calcview function makes it work much better. So don't touch this stuff.
 	-- TODO: add variables to change mouse sensitiviy in these (currently dictated by the /35's)
-	mousemove.x = math.Clamp( mouse.x /(35+aimfov) + mousemove.x, -360, 360)
-	if ( mousemove.x == 360 ) or ( mousemove.x == -360 ) then mousemove.x = 0 end
-	mousemove.x = CLerp( mousemove.x, autoturn, 0.03 )
+	mousemove.x = math.Clamp( mouse.x /(35+aimfov) + mousemove.x, -180, 180)
+	if ( mousemove.x == 180 ) then mousemove.x = -180
+	elseif ( mousemove.x == -180 ) then
+		mousemove.x = 180
+	end
+	
+	if ( autoturntimer < CurTime() ) and ( toggleautoturn:GetBool() ) then
+		mousemove.x = CLerp( mousemove.x, autoturn, 0.07 )
+	end
+	
+
 	
 	mousemove.y = math.Clamp( mouse.y /(35+aimfov) + mousemove.y, -60, 89 )
 	
@@ -394,7 +486,7 @@ local function GCCreateMove( cmd )
 		movementanglefinal.y = neweyeangs.y
 		movementanglefinal.x = neweyeangs.x
 		
-		-- allows for the character's movement angles to remain unchanged while aiming
+		-- allows for the character's movement angles to appear unchanged while aiming
 		if ( !DisabledMoveTypes[ply:GetMoveType()] ) then 
 			movementvector = Vector( cmd:GetForwardMove(), cmd:GetSideMove(), cmd:GetUpMove() )
 			movementvector:Rotate( cmd:GetViewAngles() - sideang )
@@ -412,6 +504,13 @@ local function GCCreateMove( cmd )
 
 	playerangles = cmd:GetViewAngles()
 	cmd:SetViewAngles(movementanglefinal)
+	
+	-- Check to see if the player is moving (stops poseparameters from working after no mouse input for x amount of time while moving)
+	if ( cmd:KeyDown(IN_FORWARD) ) or ( cmd:KeyDown(IN_MOVERIGHT) ) or ( cmd:KeyDown(IN_MOVELEFT) ) or ( cmd:KeyDown(IN_BACK) ) then
+		PlayerIsMoving = true
+	else
+		PlayerIsMoving = false
+	end
 	
 	return true
 end
@@ -448,15 +547,16 @@ local function GCKeyPress( ply, key )
 	if !game.SinglePlayer() and !IsFirstTimePredicted() then return end
 	if !IsValid( ply ) or ply != LocalPlayer() then return end
 	
-	if  ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( !AimIsToggled ) then
+	if  ( key == IN_ATTACK2 ) and ( togglermbaim:GetBool() ) and ( !AimIsToggled ) then
 			IsAiming = true
 			AimIsToggled = true
-	elseif ( key == IN_ATTACK2 ) and ( toggleaim:GetBool() ) and ( AimIsToggled ) then
+	elseif ( key == IN_ATTACK2 ) and ( togglermbaim:GetBool() ) and ( AimIsToggled ) then
 			IsAiming = false
 			AimIsToggled = false
 			aimfov = Lerp(0.5, 0, aimfov)
 	end
 end
+
 
 -- TODO: Add hook checks for health & safety reasons. Also add hook checks for CTP and STP and maybe the PAC camera for compatibility.
 function gtp:Enable()
@@ -468,6 +568,7 @@ function gtp:Enable()
 	hook.Add( "KeyPress" , "GCKeyPress", GCKeyPress )
 	hook.Add( "HUDPaint","Crosshair", GCCrosshair )
 	hook.Add( "HUDShouldDraw", "HideDefaultCrosshair", HideDefaultCrosshair )
+	hook.Add( "UpdateAnimation", "GCUpdateAnimation", GCUpdateAnimation)
 end
 
 function gtp:Disable()
@@ -479,6 +580,7 @@ function gtp:Disable()
 	hook.Remove( "PlayerBindPress", "GCBindPress", GCBindPress )
 	hook.Remove( "KeyPress" , "GCKeyPress", GCKeyPress )
 	hook.Remove( "HUDShouldDraw", "HideDefaultCrosshair", HideDefaultCrosshair )
+	hook.Remove( "UpdateAnimation", "GCUpdateAnimation", GCUpdateAnimation)
 end
 
 function gtp:Toggle()
@@ -523,6 +625,27 @@ if CLIENT then
 		Panel:AddControl( "Slider", params )
 		Panel:ControlHelp("Hint: You can also use Alt+Scrollwheel to change the view distance on the fly")
 		
+		Panel:CheckBox("Enable Auto-Turn:","gtp_toggleautoturn")
+		Panel:ControlHelp("Sets whether the camera will automatically turn with the player when moving")
+		
+		local params = {}
+		params.Label = "Auto-Turn Speed:"
+		params.Type = "Float" 
+		params.Min = 0
+		params.Max = 100
+		params.Command = "gtp_autoturnspeed"
+		Panel:AddControl( "Slider", params )
+		Panel:ControlHelp("Speed at which the camera automatically turns with the player character")
+	
+		local params = {}
+		params.Label = "Auto-Turn Time:"
+		params.Type = "Float" 
+		params.Min = 1
+		params.Max = 100
+		params.Command = "gtp_autoturntime"
+		Panel:AddControl( "Slider", params )
+		Panel:ControlHelp("Sets amount of time without mouse input before auto-turn engages")
+		
 		local params = {}
 		params.Label = "Turning Speed:"
 		params.Type = "Float" 
@@ -539,28 +662,31 @@ if CLIENT then
 		params.Max = 100
 		params.Command = "gtp_aimtime"
 		Panel:AddControl( "Slider", params )
-		Panel:ControlHelp("Sets the amount of time your player character aims for (in seconds)")
+		Panel:ControlHelp("Sets the amount of time your player character aims for after firing a weapon (in seconds)")
 		
 		local params = {}
-		params.Label = "Aiming Distance:"
+		params.Label = "ADS Distance:"
 		params.Type = "Float" 
 		params.Min = -100
 		params.Max = 100
 		params.Command = "gtp_aimdist"
 		Panel:AddControl( "Slider", params )
-		Panel:ControlHelp("Sets the aiming distance")
+		Panel:ControlHelp("Sets the ADS aiming camera distance")
 		
 		local params = {}
-		params.Label = "Aiming Field of View:"
+		params.Label = "ADS Field of View:"
 		params.Type = "Float" 
 		params.Min = -100
 		params.Max = 100
 		params.Command = "gtp_aimfov"
 		Panel:AddControl( "Slider", params )
-		Panel:ControlHelp("Sets the aiming FoV")
+		Panel:ControlHelp("Sets the ADS aiming camera FoV")
 		
-		Panel:CheckBox("Toggle Aim on RMB Click:","gtp_toggleaim")
-		Panel:ControlHelp("Aim is toggled on click instead of operating on a timer")
+		Panel:CheckBox("Toggle ADS on RMB Click:","gtp_togglermbaim")
+		Panel:ControlHelp("ADS Aim is toggled on RMB click")
+		
+		Panel:CheckBox("Toggle Aim:","gtp_toggleaim")
+		Panel:ControlHelp("Permanantly toggles aiming as long as this is checked (ADS still works independently)")
 		
 		Panel:CheckBox("Use custom crosshair:","gtp_togglecrosshair")
 		Panel:ControlHelp("Use GTP's crosshair instead of default; only appears when aiming")
