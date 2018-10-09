@@ -6,6 +6,8 @@ end
 
 gtp = gtp or {}
 
+gtpe = false
+
 -- Not sure if having this many variables is healthy. Should look into a better method of managing values without contracting visual cancaids.
 local neweyeangs
 local cameratracehitpos
@@ -33,6 +35,7 @@ local movementanglemouse = (Angle(0,0,0))
 local playerangles = (Angle(0,0,0))
 local gcvang = (Angle(0,0,0))
 local gcvpos = (Vector(0,0,0))
+local movementvector = (Vector(0,0,0))
 local IsEnabled = false
 local IsAiming = false
 local AllowZoom = false
@@ -55,6 +58,8 @@ local toggleaim = CreateConVar("gtp_toggleaim","false",FCVAR_ARCHIVE)
 local togglermbaim = CreateConVar("gtp_togglermbaim","false",FCVAR_ARCHIVE)
 local togglecrosshair = CreateConVar("gtp_togglecrosshair","true",FCVAR_ARCHIVE)
 local sensitivity = CreateConVar("gtp_sensitivity","45",FCVAR_ARCHIVE)
+
+local test = CreateConVar("gtp_test","1",FCVAR_ARCHIVE)
 
 local DisabledMoveTypes = {
 	[MOVETYPE_FLY] = true,
@@ -164,6 +169,15 @@ end
 
 concommand.Add( "gtp_sensitivity", SetSensitivity )
 
+function SetTest( ply, cmd, args )
+	if args[1] then
+		local numberinput = tonumber( args[1] )
+		test:SetFloat(numberinput)
+	end
+end
+
+concommand.Add( "gtp_test", SetTest )
+
 function SetAimFOV( ply, cmd, args )
 	if args[1] then
 		local numberinput = tonumber( args[1] )
@@ -268,12 +282,13 @@ local function GCCalcView( ply, pos, angles, fov )
 end
 
 -- Animations updated in here
---[[
 local function GCUpdateAnimation( ply, velocity, maxseqgroundspeed )
 
 	-- Set poseparameters on the head
 	-- Most of this stuff is just here to make it look nice
 
+	if IsAiming then return end
+	
 	local ppeyeangs = LocalPlayer():EyeAngles()
 
 	gtp_poseparam_headyaw = gcvang - ppeyeangs
@@ -287,7 +302,7 @@ local function GCUpdateAnimation( ply, velocity, maxseqgroundspeed )
 	gtp_poseparam_headyaw = math.Clamp(gtp_poseparam_headyaw, -79, 79)
 
 	
-	if ( PlayerIsMoving ) and ( autoturntimer < CurTime() ) then
+	if ( PlayerIsMoving ) and ( autoturntimer < CurTime() ) and test:GetFloat() < 1 then
 		gtp_poseparam_headyaw = (gtp_poseparam_headyaw*-1)/5
 	end
 	
@@ -301,13 +316,12 @@ local function GCUpdateAnimation( ply, velocity, maxseqgroundspeed )
 	
 	LocalPlayer():SetPoseParameter("head_yaw", gtp_poseparam_headyaw_final)
 
-	//net.Start("gtp_poseparams_fromclient")
-	//net.WriteFloat(gtp_poseparam_headyaw_final)
+	--net.Start("gtp_poseparams_fromclient")
+	--net.WriteFloat(gtp_poseparam_headyaw_final)
 	
-	//net.SendToServer()
+	--net.SendToServer()
 	
 end
-]]--
 
 local function GCCreateMove( cmd )
 	
@@ -381,8 +395,11 @@ local function GCCreateMove( cmd )
 	end
 	-- main movement system
 	
+	--[[
 	local angledifferencetest = (math.AngleDifference(movementanglefinal.y, movementangletarget.y))
 	angledifferencetest = math.abs(angledifferencetest)
+	angledifferencetest = math.Remap(angledifferencetest, 90, 180, 0, 1000)*-1
+	math.Round(angledifferencetest)
 	
 	local angledifference2 = (math.AngleDifference(movementanglefinal.y, movementangletarget.y))
 	angledifference2 = math.abs(angledifference2)
@@ -393,26 +410,29 @@ local function GCCreateMove( cmd )
 	if (math.AngleDifference(movementanglefinal.y, movementangletarget.y) < 0 ) then
 		angledifference2 = angledifference2*-1
 	end
-
-
+	--]]
+	
+	movementvector = Vector( cmd:GetForwardMove(), cmd:GetSideMove(), cmd:GetUpMove() )
+	movementvector:Rotate( cmd:GetViewAngles() - gcvang )
+	
 	
 	if ( cmd:KeyDown(IN_FORWARD) and !IsAiming ) then
 		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1
 		movementangletarget.y = movementanglemouse.y
-		cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-		cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+		cmd:SetForwardMove( movementvector.x )
+		cmd:SetSideMove( movementvector.y )
 			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
 				LastKeyRight = true
 				movementangletarget.y = movementanglemouse.y-45
-				cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-				cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+				cmd:SetForwardMove( movementvector.x )
+				cmd:SetSideMove( movementvector.y )
 				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat()/2)/50)
 						elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 							LastKeyRight = false
 							movementangletarget.y = movementanglemouse.y+45
-							cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-							cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+							cmd:SetForwardMove( movementvector.x )
+							cmd:SetSideMove( movementvector.y )
 							autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat()/2)/50)
 			end
 	end
@@ -422,8 +442,8 @@ local function GCCreateMove( cmd )
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1-90
 			movementangletarget.y = movementanglemouse.y
-			cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-			cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+			cmd:SetForwardMove( movementvector.x )
+			cmd:SetSideMove( movementvector.y )
 			autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat())/50)
 	end
 
@@ -432,8 +452,8 @@ local function GCCreateMove( cmd )
 			movementanglefinal.x = mousemove.y
 			movementanglemouse.y = mousemove.x*-1+90
 			movementangletarget.y = movementanglemouse.y
-			cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-			cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+			cmd:SetForwardMove( movementvector.x )
+			cmd:SetSideMove( movementvector.y )
 			autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat())/50)
 	end
 
@@ -441,8 +461,8 @@ local function GCCreateMove( cmd )
 		movementanglefinal.x = mousemove.ywb
 		movementanglemouse.y = mousemove.x*-1+180
 		movementangletarget.y = movementanglemouse.y
-		cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-		cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+		cmd:SetForwardMove( movementvector.x )
+		cmd:SetSideMove( movementvector.y )
 		if not ( cmd:KeyDown(IN_MOVELEFT) or cmd:KeyDown(IN_MOVERIGHT) ) then
 			if ( LastKeyRight ) then
 				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat()*1.5)/50)
@@ -453,14 +473,14 @@ local function GCCreateMove( cmd )
 			if ( cmd:KeyDown(IN_MOVERIGHT) ) then
 				LastKeyRight = true
 				movementangletarget.y = movementanglemouse.y+45
-				cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-				cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+				cmd:SetForwardMove( movementvector.x )
+				cmd:SetSideMove( movementvector.y )
 				autoturn = math.ApproachAngle( autoturn, mousemove.x+80, (autoturnspeedset:GetFloat()*1.5)/50)
 					elseif ( cmd:KeyDown(IN_MOVELEFT) ) then
 						LastKeyRight = false
 						movementangletarget.y = movementanglemouse.y-45
-						cmd:SetForwardMove((math.Remap(angledifferencetest, 90, 180, 0, 1000))*-1)
-						cmd:SetSideMove(math.Clamp(angledifference2, -1000, 1000))
+						cmd:SetForwardMove( movementvector.x )
+						cmd:SetSideMove( movementvector.y )
 						autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat()*1.5)/50)
 			end
 	end
@@ -585,6 +605,7 @@ end
 -- TODO: Add hook checks for health & safety reasons. Also add hook checks for CTP and STP and maybe the PAC camera for compatibility.
 function gtp:Enable()
 	IsEnabled = true
+	gtpe = true
 	print("attempting to create gtp hooks")
 	hook.Add( "CreateMove", "GCCreateMove", GCCreateMove )
 	hook.Add( "CalcView", "GCCalcView", GCCalcView )
@@ -597,6 +618,7 @@ end
 
 function gtp:Disable()
 	IsEnabled = false
+	gtpe = false
 	print("attempting to remove gtp hooks")
 	hook.Remove( "CreateMove", "GCCreateMove", GCCreateMove )
 	hook.Remove( "CalcView", "GCCalcView", GCCalcView )
@@ -698,14 +720,6 @@ if CLIENT then
 		Panel:ControlHelp("Sets the ADS aiming camera distance")
 		
 		local params = {}
-		params.Label = "Mouse Sensitivity:"
-		params.Type = "Float" 
-		params.Min = 0
-		params.Max = 100
-		params.Command = "gtp_sensitivity"
-		Panel:AddControl( "Slider", params )
-		
-		local params = {}
 		params.Label = "ADS Field of View:"
 		params.Type = "Float" 
 		params.Min = -100
@@ -713,6 +727,14 @@ if CLIENT then
 		params.Command = "gtp_aimfov"
 		Panel:AddControl( "Slider", params )
 		Panel:ControlHelp("Sets the ADS aiming camera FoV")
+		
+		local params = {}
+		params.Label = "Mouse Sensitivity:"
+		params.Type = "Float" 
+		params.Min = 0
+		params.Max = 100
+		params.Command = "gtp_sensitivity"
+		Panel:AddControl( "Slider", params )
 		
 		Panel:CheckBox("Toggle ADS on RMB Click:","gtp_togglermbaim")
 		Panel:ControlHelp("ADS Aim is toggled on RMB click")
