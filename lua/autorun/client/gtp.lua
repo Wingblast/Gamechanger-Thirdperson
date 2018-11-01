@@ -34,8 +34,13 @@ local movementangletarget = (Angle(0,0,0))
 local movementanglemouse = (Angle(0,0,0))
 local playerangles = (Angle(0,0,0))
 local gcvang = (Angle(0,0,0))
+local cameraangle = (Angle(0,0,0))
+local newcamangles = (Angle(0,0,0))
+local newcampos = (Vector(0,0,0))
 local gcvpos = (Vector(0,0,0))
 local movementvector = (Vector(0,0,0))
+local movementvectordbg = (Vector(0,0,0))
+local camerapos = (Vector(0,0,0))
 local IsEnabled = false
 local IsAiming = false
 local AllowZoom = false
@@ -58,6 +63,7 @@ local toggleaim = CreateConVar("gtp_toggleaim","false",FCVAR_ARCHIVE)
 local togglermbaim = CreateConVar("gtp_togglermbaim","false",FCVAR_ARCHIVE)
 local togglecrosshair = CreateConVar("gtp_togglecrosshair","true",FCVAR_ARCHIVE)
 local sensitivity = CreateConVar("gtp_sensitivity","45",FCVAR_ARCHIVE)
+local toggledebughud = CreateConVar("gtp_toggledebughud","false",FCVAR_ARCHIVE)
 
 local test = CreateConVar("gtp_test","1",FCVAR_ARCHIVE)
 
@@ -214,6 +220,16 @@ end
 
 concommand.Add( "gtp_autoturntime", autoturntimeset )
 
+function SetToggleDebugHud( ply, cmd, args )
+	if args[1] then
+		local boolinput = tobool( args[1] )
+		toggledebughud:SetBool( boolinput )
+	end
+end
+
+concommand.Add("gtp_toggledebughud", SetToggleDebugHud )
+
+
 
 function ConvertAim(from, to)
 	local ang = to - from
@@ -341,6 +357,7 @@ local function GCCreateMove( cmd )
 	trace.mask = MASK_SHOT
 	cameratracehitpos = util.TraceLine( trace )
 	
+	
 	if ( !IsPhysgunRotating ) then
 		mouse.x = cmd:GetMouseX()
 		mouse.y = cmd:GetMouseY()
@@ -458,7 +475,7 @@ local function GCCreateMove( cmd )
 	end
 
 	if ( cmd:KeyDown(IN_BACK) and !IsAiming ) then
-		movementanglefinal.x = mousemove.ywb
+		movementanglefinal.x = mousemove.y
 		movementanglemouse.y = mousemove.x*-1+180
 		movementangletarget.y = movementanglemouse.y
 		cmd:SetForwardMove( movementvector.x )
@@ -484,6 +501,7 @@ local function GCCreateMove( cmd )
 						autoturn = math.ApproachAngle( autoturn, mousemove.x-80, (autoturnspeedset:GetFloat()*1.5)/50)
 			end
 	end
+	
 	
 	-- Auto-Turn stuff
 	if ( cmd:GetMouseX() ~= 0 or cmd:GetMouseY() ~= 0 ) then
@@ -552,6 +570,9 @@ local function GCCreateMove( cmd )
 		PlayerIsMoving = false
 	end
 	
+	--debug
+	movementvectordbg = Vector( cmd:GetForwardMove(), cmd:GetSideMove(), cmd:GetUpMove() )
+	
 	return true
 end
 
@@ -565,6 +586,27 @@ function GCCrosshair()
 	
 	surface.SetTexture(surface.GetTextureID("crosshair/gtp_crosshair"))
 	surface.DrawTexturedRect( ScrW()/2 - 7, ScrH()/2 - 5, 12, 12 )
+
+end
+
+function GCDebug()
+
+	if !(toggledebughud:GetBool()) then return end
+
+	local forward = movementvectordbg.x/200
+	local side = movementvectordbg.y/200
+	
+	surface.SetDrawColor( 255, 255, 255, 255 )
+	surface.DrawCircle( ScrW()/2 - 850, ScrH()/2 + 300, 50, 255, 255, 255, 255)
+	surface.DrawRect(ScrW()/2 - 850-3+side, ScrH()/2 + 300-3-forward, 6, 6)
+	
+	surface.SetFont( "DebugFixed" )
+	surface.SetTextColor( 255, 255, 255, 255 )
+	surface.SetTextPos( 200, 800 )
+	surface.DrawText( movementvectordbg.x )
+	
+	surface.SetTextPos( 200, 860 )
+	surface.DrawText( movementvectordbg.y )
 	
 end
 
@@ -612,6 +654,7 @@ function gtp:Enable()
 	hook.Add( "PlayerBindPress", "GCBindPress", GCBindPress )
 	hook.Add( "KeyPress" , "GCKeyPress", GCKeyPress )
 	hook.Add( "HUDPaint","Crosshair", GCCrosshair )
+	hook.Add( "HUDPaint","Debug", GCDebug )
 	hook.Add( "HUDShouldDraw", "HideDefaultCrosshair", HideDefaultCrosshair )
 	hook.Add( "UpdateAnimation", "GCUpdateAnimation", GCUpdateAnimation)
 end
@@ -623,6 +666,7 @@ function gtp:Disable()
 	hook.Remove( "CreateMove", "GCCreateMove", GCCreateMove )
 	hook.Remove( "CalcView", "GCCalcView", GCCalcView )
 	hook.Remove( "HUDPaint","Crosshair", GCCrosshair )
+	hook.Remove( "HUDPaint","Debug", GCDebug )
 	hook.Remove( "PlayerBindPress", "GCBindPress", GCBindPress )
 	hook.Remove( "KeyPress" , "GCKeyPress", GCKeyPress )
 	hook.Remove( "HUDShouldDraw", "HideDefaultCrosshair", HideDefaultCrosshair )
@@ -704,7 +748,7 @@ if CLIENT then
 		local params = {}
 		params.Label = "Aiming Time:"
 		params.Type = "Float" 
-		params.Min = -100
+		params.Min = 0
 		params.Max = 100
 		params.Command = "gtp_aimtime"
 		Panel:AddControl( "Slider", params )
@@ -753,6 +797,9 @@ if CLIENT then
 		params.Command = "gtp_fov"
 		Panel:AddControl( "Slider", params )
 		Panel:ControlHelp("Sets the overall thirdperson FOV (current numbers are dumb, I know, will be fixed later)")
+		
+		Panel:CheckBox("Toggle debug HUD:","gtp_toggledebughud")
+		Panel:ControlHelp("Shhh. You don't need this.")
 		
 	end
 
